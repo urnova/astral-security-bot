@@ -19,6 +19,24 @@ bot = commands.Bot(command_prefix='!', intents=intents)
 LOG_CHANNEL_ID = None
 logs_data = []
 
+# État de maintenance
+MAINTENANCE_MODE = False
+MAINTENANCE_REASON = ""
+
+# Check de maintenance
+def maintenance_check():
+    async def predicate(ctx):
+        if MAINTENANCE_MODE and not ctx.author.guild_permissions.administrator:
+            embed = discord.Embed(
+                title="🔧 Serveur en maintenance",
+                description=f"Le serveur est actuellement en maintenance.\n**Raison:** {MAINTENANCE_REASON}",
+                color=discord.Color.orange()
+            )
+            await ctx.send(embed=embed)
+            return False
+        return True
+    return commands.check(predicate)
+
 # Événement de démarrage
 @bot.event
 async def on_ready():
@@ -81,6 +99,7 @@ async def set_log_channel(ctx, channel: discord.TextChannel):
 # Commande kick
 @bot.command(name='kick')
 @commands.has_permissions(kick_members=True)
+@maintenance_check()
 async def kick_member(ctx, member: discord.Member, *, reason="Aucune raison spécifiée"):
     """Exclure un membre du serveur"""
     try:
@@ -105,6 +124,7 @@ async def kick_member(ctx, member: discord.Member, *, reason="Aucune raison spé
 # Commande ban
 @bot.command(name='ban')
 @commands.has_permissions(ban_members=True)
+@maintenance_check()
 async def ban_member(ctx, member: discord.Member, *, reason="Aucune raison spécifiée"):
     """Bannir un membre du serveur"""
     try:
@@ -129,6 +149,7 @@ async def ban_member(ctx, member: discord.Member, *, reason="Aucune raison spéc
 # Commande unban
 @bot.command(name='unban')
 @commands.has_permissions(ban_members=True)
+@maintenance_check()
 async def unban_member(ctx, user_id: int, *, reason="Aucune raison spécifiée"):
     """Débannir un utilisateur"""
     try:
@@ -154,6 +175,7 @@ async def unban_member(ctx, user_id: int, *, reason="Aucune raison spécifiée")
 # Commande mute (timeout)
 @bot.command(name='mute')
 @commands.has_permissions(moderate_members=True)
+@maintenance_check()
 async def mute_member(ctx, member: discord.Member, duration: int = 10, *, reason="Aucune raison spécifiée"):
     """Mettre un membre en timeout (durée en minutes)"""
     try:
@@ -298,6 +320,85 @@ async def server_info(ctx):
     
     await ctx.send(embed=embed)
 
+# Commandes de maintenance
+@bot.command(name='maintenance')
+@commands.has_permissions(administrator=True)
+async def enable_maintenance(ctx, *, reason="Maintenance en cours"):
+    """Activer le mode maintenance (bloque les commandes pour les non-admins)"""
+    global MAINTENANCE_MODE, MAINTENANCE_REASON
+    MAINTENANCE_MODE = True
+    MAINTENANCE_REASON = reason
+    
+    embed = discord.Embed(
+        title="🔧 Mode maintenance activé",
+        description=f"Le serveur est maintenant en mode maintenance.\n**Raison:** {reason}",
+        color=discord.Color.orange()
+    )
+    embed.add_field(name="Activé par", value=ctx.author.mention, inline=True)
+    
+    # Envoyer dans tous les canaux textuels
+    for channel in ctx.guild.text_channels:
+        try:
+            if channel.permissions_for(ctx.guild.me).send_messages:
+                await channel.send(embed=embed)
+        except:
+            continue
+    
+    await log_action("maintenance_enable", ctx.author, reason=reason)
+
+@bot.command(name='maintenance_off')
+@commands.has_permissions(administrator=True)
+async def disable_maintenance(ctx):
+    """Désactiver le mode maintenance"""
+    global MAINTENANCE_MODE, MAINTENANCE_REASON
+    MAINTENANCE_MODE = False
+    old_reason = MAINTENANCE_REASON
+    MAINTENANCE_REASON = ""
+    
+    embed = discord.Embed(
+        title="✅ Mode maintenance désactivé",
+        description="Le serveur est de nouveau opérationnel!",
+        color=discord.Color.green()
+    )
+    embed.add_field(name="Désactivé par", value=ctx.author.mention, inline=True)
+    
+    # Envoyer dans tous les canaux textuels
+    for channel in ctx.guild.text_channels:
+        try:
+            if channel.permissions_for(ctx.guild.me).send_messages:
+                await channel.send(embed=embed)
+        except:
+            continue
+    
+    await log_action("maintenance_disable", ctx.author, reason=f"Fin de: {old_reason}")
+
+# Événement pour bloquer les messages pendant la maintenance
+@bot.event
+async def on_message(message):
+    # Ignorer les messages du bot
+    if message.author == bot.user:
+        return
+    
+    # Si en maintenance et que l'utilisateur n'est pas admin
+    if MAINTENANCE_MODE and not message.author.guild_permissions.administrator:
+        if not message.content.startswith(bot.command_prefix):
+            # Supprimer le message
+            try:
+                await message.delete()
+                # Envoyer un DM à l'utilisateur
+                embed = discord.Embed(
+                    title="🔧 Serveur en maintenance",
+                    description=f"Votre message a été supprimé car le serveur est en maintenance.\n**Raison:** {MAINTENANCE_REASON}",
+                    color=discord.Color.orange()
+                )
+                await message.author.send(embed=embed)
+            except:
+                pass
+        return
+    
+    # Traiter les commandes normalement
+    await bot.process_commands(message)
+
 # Commande d'aide
 @bot.command(name='help_security')
 async def help_security(ctx):
@@ -318,6 +419,8 @@ async def help_security(ctx):
         ("!warn <@membre> [raison]", "Avertir un membre"),
         ("!logs [nombre]", "Voir les logs de modération"),
         ("!setlogs #canal", "Configurer le canal de logs"),
+        ("!maintenance [raison]", "🔧 Activer la maintenance (Admin)"),
+        ("!maintenance_off", "✅ Désactiver la maintenance (Admin)"),
         ("!serverinfo", "Informations du serveur")
     ]
     
