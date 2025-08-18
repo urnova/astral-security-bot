@@ -2,6 +2,7 @@
 import os
 import discord
 from discord.ext import commands
+from discord import app_commands
 import asyncio
 from datetime import datetime, timedelta
 import json
@@ -13,50 +14,27 @@ intents.members = True
 intents.guilds = True
 intents.moderation = True
 
-bot = commands.Bot(command_prefix='!', intents=intents)
+class SecurityBot(commands.Bot):
+    def __init__(self):
+        super().__init__(command_prefix='!', intents=intents)
+    
+    async def on_ready(self):
+        print(f'{self.user} est connecté et prêt!')
+        print(f'Bot ID: {self.user.id}')
+        try:
+            synced = await self.tree.sync()
+            print(f'Synchronisé {len(synced)} commandes slash')
+        except Exception as e:
+            print(f'Erreur lors de la synchronisation: {e}')
+        print('-------------------')
 
-# Canal de logs (à configurer via commande)
+bot = SecurityBot()
+
+# Variables globales
 LOG_CHANNEL_ID = None
 logs_data = []
-
-# État de maintenance
 MAINTENANCE_MODE = False
 MAINTENANCE_REASON = ""
-
-# Check de maintenance
-def maintenance_check():
-    async def predicate(ctx):
-        if MAINTENANCE_MODE and not ctx.author.guild_permissions.administrator:
-            embed = discord.Embed(
-                title="🔧 Serveur en maintenance",
-                description=f"Le serveur est actuellement en maintenance.\n**Raison:** {MAINTENANCE_REASON}",
-                color=discord.Color.orange()
-            )
-            await ctx.send(embed=embed)
-            return False
-        return True
-    return commands.check(predicate)
-
-# Check global pour les administrateurs
-def admin_only():
-    async def predicate(ctx):
-        if not ctx.author.guild_permissions.administrator:
-            embed = discord.Embed(
-                title="❌ Accès refusé",
-                description="Cette commande est réservée aux administrateurs du serveur.",
-                color=discord.Color.red()
-            )
-            await ctx.send(embed=embed)
-            return False
-        return True
-    return commands.check(predicate)
-
-# Événement de démarrage
-@bot.event
-async def on_ready():
-    print(f'{bot.user} est connecté et prêt!')
-    print(f'Bot ID: {bot.user.id}')
-    print('-------------------')
 
 # Système de logs
 async def log_action(action, user, target=None, reason=None, channel=None):
@@ -71,11 +49,9 @@ async def log_action(action, user, target=None, reason=None, channel=None):
     }
     logs_data.append(log_entry)
     
-    # Limiter à 1000 logs maximum
     if len(logs_data) > 1000:
         logs_data.pop(0)
     
-    # Envoyer dans le canal de logs si configuré
     if LOG_CHANNEL_ID:
         log_channel = bot.get_channel(LOG_CHANNEL_ID)
         if log_channel:
@@ -94,28 +70,26 @@ async def log_action(action, user, target=None, reason=None, channel=None):
             
             await log_channel.send(embed=embed)
 
-# Configuration du canal de logs
-@bot.command(name='setlogs')
-@admin_only()
-async def set_log_channel(ctx, channel: discord.TextChannel):
-    """Configure le canal pour les logs de modération"""
-    global LOG_CHANNEL_ID
-    LOG_CHANNEL_ID = channel.id
+# Commandes slash pour la modération
+@bot.tree.command(name="kick", description="Exclure un membre du serveur")
+@app_commands.describe(
+    member="Le membre à exclure",
+    reason="La raison de l'exclusion"
+)
+async def kick_slash(interaction: discord.Interaction, member: discord.Member, reason: str = "Aucune raison spécifiée"):
+    if not interaction.user.guild_permissions.administrator:
+        await interaction.response.send_message("❌ Cette commande est réservée aux administrateurs.", ephemeral=True)
+        return
     
-    embed = discord.Embed(
-        title="✅ Canal de logs configuré",
-        description=f"Les logs seront maintenant envoyés dans {channel.mention}",
-        color=discord.Color.green()
-    )
-    await ctx.send(embed=embed)
-    await log_action("Configuration", ctx.author, channel=channel)
-
-# Commande kick
-@bot.command(name='kick')
-@admin_only()
-@maintenance_check()
-async def kick_member(ctx, member: discord.Member, *, reason="Aucune raison spécifiée"):
-    """Exclure un membre du serveur"""
+    if MAINTENANCE_MODE and not interaction.user.guild_permissions.administrator:
+        embed = discord.Embed(
+            title="🔧 Serveur en maintenance",
+            description=f"Le serveur est actuellement en maintenance.\n**Raison:** {MAINTENANCE_REASON}",
+            color=discord.Color.orange()
+        )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+        return
+    
     try:
         await member.kick(reason=reason)
         
@@ -125,22 +99,26 @@ async def kick_member(ctx, member: discord.Member, *, reason="Aucune raison spé
             color=discord.Color.orange()
         )
         embed.add_field(name="Raison", value=reason, inline=False)
-        embed.add_field(name="Modérateur", value=ctx.author.mention, inline=True)
+        embed.add_field(name="Modérateur", value=interaction.user.mention, inline=True)
         
-        await ctx.send(embed=embed)
-        await log_action("kick", ctx.author, member, reason)
+        await interaction.response.send_message(embed=embed)
+        await log_action("kick", interaction.user, member, reason)
         
     except discord.Forbidden:
-        await ctx.send("❌ Je n'ai pas les permissions pour exclure ce membre.")
+        await interaction.response.send_message("❌ Je n'ai pas les permissions pour exclure ce membre.", ephemeral=True)
     except Exception as e:
-        await ctx.send(f"❌ Erreur lors de l'exclusion: {str(e)}")
+        await interaction.response.send_message(f"❌ Erreur lors de l'exclusion: {str(e)}", ephemeral=True)
 
-# Commande ban
-@bot.command(name='ban')
-@admin_only()
-@maintenance_check()
-async def ban_member(ctx, member: discord.Member, *, reason="Aucune raison spécifiée"):
-    """Bannir un membre du serveur"""
+@bot.tree.command(name="ban", description="Bannir un membre du serveur")
+@app_commands.describe(
+    member="Le membre à bannir",
+    reason="La raison du bannissement"
+)
+async def ban_slash(interaction: discord.Interaction, member: discord.Member, reason: str = "Aucune raison spécifiée"):
+    if not interaction.user.guild_permissions.administrator:
+        await interaction.response.send_message("❌ Cette commande est réservée aux administrateurs.", ephemeral=True)
+        return
+    
     try:
         await member.ban(reason=reason)
         
@@ -150,25 +128,30 @@ async def ban_member(ctx, member: discord.Member, *, reason="Aucune raison spéc
             color=discord.Color.red()
         )
         embed.add_field(name="Raison", value=reason, inline=False)
-        embed.add_field(name="Modérateur", value=ctx.author.mention, inline=True)
+        embed.add_field(name="Modérateur", value=interaction.user.mention, inline=True)
         
-        await ctx.send(embed=embed)
-        await log_action("ban", ctx.author, member, reason)
+        await interaction.response.send_message(embed=embed)
+        await log_action("ban", interaction.user, member, reason)
         
     except discord.Forbidden:
-        await ctx.send("❌ Je n'ai pas les permissions pour bannir ce membre.")
+        await interaction.response.send_message("❌ Je n'ai pas les permissions pour bannir ce membre.", ephemeral=True)
     except Exception as e:
-        await ctx.send(f"❌ Erreur lors du bannissement: {str(e)}")
+        await interaction.response.send_message(f"❌ Erreur lors du bannissement: {str(e)}", ephemeral=True)
 
-# Commande unban
-@bot.command(name='unban')
-@admin_only()
-@maintenance_check()
-async def unban_member(ctx, user_id: int, *, reason="Aucune raison spécifiée"):
-    """Débannir un utilisateur"""
+@bot.tree.command(name="unban", description="Débannir un utilisateur")
+@app_commands.describe(
+    user_id="L'ID de l'utilisateur à débannir",
+    reason="La raison du débannissement"
+)
+async def unban_slash(interaction: discord.Interaction, user_id: str, reason: str = "Aucune raison spécifiée"):
+    if not interaction.user.guild_permissions.administrator:
+        await interaction.response.send_message("❌ Cette commande est réservée aux administrateurs.", ephemeral=True)
+        return
+    
     try:
-        user = await bot.fetch_user(user_id)
-        await ctx.guild.unban(user, reason=reason)
+        user_id_int = int(user_id)
+        user = await bot.fetch_user(user_id_int)
+        await interaction.guild.unban(user, reason=reason)
         
         embed = discord.Embed(
             title="✅ Utilisateur débanni",
@@ -176,22 +159,29 @@ async def unban_member(ctx, user_id: int, *, reason="Aucune raison spécifiée")
             color=discord.Color.green()
         )
         embed.add_field(name="Raison", value=reason, inline=False)
-        embed.add_field(name="Modérateur", value=ctx.author.mention, inline=True)
+        embed.add_field(name="Modérateur", value=interaction.user.mention, inline=True)
         
-        await ctx.send(embed=embed)
-        await log_action("unban", ctx.author, user, reason)
+        await interaction.response.send_message(embed=embed)
+        await log_action("unban", interaction.user, user, reason)
         
+    except ValueError:
+        await interaction.response.send_message("❌ ID utilisateur invalide.", ephemeral=True)
     except discord.NotFound:
-        await ctx.send("❌ Utilisateur non trouvé ou non banni.")
+        await interaction.response.send_message("❌ Utilisateur non trouvé ou non banni.", ephemeral=True)
     except Exception as e:
-        await ctx.send(f"❌ Erreur lors du débannissement: {str(e)}")
+        await interaction.response.send_message(f"❌ Erreur lors du débannissement: {str(e)}", ephemeral=True)
 
-# Commande mute (timeout)
-@bot.command(name='mute')
-@admin_only()
-@maintenance_check()
-async def mute_member(ctx, member: discord.Member, duration: int = 10, *, reason="Aucune raison spécifiée"):
-    """Mettre un membre en timeout (durée en minutes)"""
+@bot.tree.command(name="mute", description="Mettre un membre en timeout")
+@app_commands.describe(
+    member="Le membre à mettre en timeout",
+    duration="Durée en minutes (défaut: 10)",
+    reason="La raison du timeout"
+)
+async def mute_slash(interaction: discord.Interaction, member: discord.Member, duration: int = 10, reason: str = "Aucune raison spécifiée"):
+    if not interaction.user.guild_permissions.administrator:
+        await interaction.response.send_message("❌ Cette commande est réservée aux administrateurs.", ephemeral=True)
+        return
+    
     try:
         timeout_until = datetime.now() + timedelta(minutes=duration)
         await member.timeout(timeout_until, reason=reason)
@@ -202,21 +192,26 @@ async def mute_member(ctx, member: discord.Member, duration: int = 10, *, reason
             color=discord.Color.orange()
         )
         embed.add_field(name="Raison", value=reason, inline=False)
-        embed.add_field(name="Modérateur", value=ctx.author.mention, inline=True)
+        embed.add_field(name="Modérateur", value=interaction.user.mention, inline=True)
         
-        await ctx.send(embed=embed)
-        await log_action("mute", ctx.author, member, f"{reason} ({duration} min)")
+        await interaction.response.send_message(embed=embed)
+        await log_action("mute", interaction.user, member, f"{reason} ({duration} min)")
         
     except discord.Forbidden:
-        await ctx.send("❌ Je n'ai pas les permissions pour timeout ce membre.")
+        await interaction.response.send_message("❌ Je n'ai pas les permissions pour timeout ce membre.", ephemeral=True)
     except Exception as e:
-        await ctx.send(f"❌ Erreur lors du timeout: {str(e)}")
+        await interaction.response.send_message(f"❌ Erreur lors du timeout: {str(e)}", ephemeral=True)
 
-# Commande unmute
-@bot.command(name='unmute')
-@admin_only()
-async def unmute_member(ctx, member: discord.Member, *, reason="Aucune raison spécifiée"):
-    """Retirer le timeout d'un membre"""
+@bot.tree.command(name="unmute", description="Retirer le timeout d'un membre")
+@app_commands.describe(
+    member="Le membre dont retirer le timeout",
+    reason="La raison du retrait de timeout"
+)
+async def unmute_slash(interaction: discord.Interaction, member: discord.Member, reason: str = "Aucune raison spécifiée"):
+    if not interaction.user.guild_permissions.administrator:
+        await interaction.response.send_message("❌ Cette commande est réservée aux administrateurs.", ephemeral=True)
+        return
+    
     try:
         await member.timeout(None, reason=reason)
         
@@ -226,49 +221,76 @@ async def unmute_member(ctx, member: discord.Member, *, reason="Aucune raison sp
             color=discord.Color.green()
         )
         embed.add_field(name="Raison", value=reason, inline=False)
-        embed.add_field(name="Modérateur", value=ctx.author.mention, inline=True)
+        embed.add_field(name="Modérateur", value=interaction.user.mention, inline=True)
         
-        await ctx.send(embed=embed)
-        await log_action("unmute", ctx.author, member, reason)
+        await interaction.response.send_message(embed=embed)
+        await log_action("unmute", interaction.user, member, reason)
         
     except Exception as e:
-        await ctx.send(f"❌ Erreur lors du retrait du timeout: {str(e)}")
+        await interaction.response.send_message(f"❌ Erreur lors du retrait du timeout: {str(e)}", ephemeral=True)
 
-# Commande clear (supprimer messages)
-@bot.command(name='clear')
-@admin_only()
-async def clear_messages(ctx, amount: int = 10):
-    """Supprimer un nombre de messages (max 100)"""
+@bot.tree.command(name="warn", description="Avertir un membre")
+@app_commands.describe(
+    member="Le membre à avertir",
+    reason="La raison de l'avertissement"
+)
+async def warn_slash(interaction: discord.Interaction, member: discord.Member, reason: str = "Aucune raison spécifiée"):
+    if not interaction.user.guild_permissions.administrator:
+        await interaction.response.send_message("❌ Cette commande est réservée aux administrateurs.", ephemeral=True)
+        return
+    
+    embed = discord.Embed(
+        title="⚠️ Avertissement",
+        description=f"{member.mention} a reçu un avertissement",
+        color=discord.Color.yellow()
+    )
+    embed.add_field(name="Raison", value=reason, inline=False)
+    embed.add_field(name="Modérateur", value=interaction.user.mention, inline=True)
+    
+    await interaction.response.send_message(embed=embed)
+    await log_action("warn", interaction.user, member, reason)
+
+@bot.tree.command(name="clear", description="Supprimer des messages")
+@app_commands.describe(
+    amount="Nombre de messages à supprimer (max 100)"
+)
+async def clear_slash(interaction: discord.Interaction, amount: int = 10):
+    if not interaction.user.guild_permissions.administrator:
+        await interaction.response.send_message("❌ Cette commande est réservée aux administrateurs.", ephemeral=True)
+        return
+    
     if amount > 100:
         amount = 100
     
     try:
-        deleted = await ctx.channel.purge(limit=amount + 1)  # +1 pour inclure la commande
+        await interaction.response.defer()
+        deleted = await interaction.channel.purge(limit=amount)
         
         embed = discord.Embed(
             title="🧹 Messages supprimés",
-            description=f"{len(deleted) - 1} messages ont été supprimés",
+            description=f"{len(deleted)} messages ont été supprimés",
             color=discord.Color.blue()
         )
-        embed.add_field(name="Modérateur", value=ctx.author.mention, inline=True)
-        embed.add_field(name="Canal", value=ctx.channel.mention, inline=True)
+        embed.add_field(name="Modérateur", value=interaction.user.mention, inline=True)
+        embed.add_field(name="Canal", value=interaction.channel.mention, inline=True)
         
-        msg = await ctx.send(embed=embed)
-        await asyncio.sleep(3)
-        await msg.delete()
-        
-        await log_action("clear", ctx.author, channel=ctx.channel, reason=f"{len(deleted) - 1} messages supprimés")
+        await interaction.followup.send(embed=embed, ephemeral=True)
+        await log_action("clear", interaction.user, channel=interaction.channel, reason=f"{len(deleted)} messages supprimés")
         
     except Exception as e:
-        await ctx.send(f"❌ Erreur lors de la suppression: {str(e)}")
+        await interaction.followup.send(f"❌ Erreur lors de la suppression: {str(e)}", ephemeral=True)
 
-# Commande pour voir les logs
-@bot.command(name='logs')
-@admin_only()
-async def view_logs(ctx, limit: int = 10):
-    """Afficher les derniers logs de modération"""
+@bot.tree.command(name="logs", description="Afficher les logs de modération")
+@app_commands.describe(
+    limit="Nombre de logs à afficher (max 20)"
+)
+async def logs_slash(interaction: discord.Interaction, limit: int = 10):
+    if not interaction.user.guild_permissions.administrator:
+        await interaction.response.send_message("❌ Cette commande est réservée aux administrateurs.", ephemeral=True)
+        return
+    
     if not logs_data:
-        await ctx.send("❌ Aucun log disponible.")
+        await interaction.response.send_message("❌ Aucun log disponible.", ephemeral=True)
         return
     
     if limit > 20:
@@ -297,29 +319,91 @@ async def view_logs(ctx, limit: int = 10):
             inline=False
         )
     
-    await ctx.send(embed=embed)
+    await interaction.response.send_message(embed=embed, ephemeral=True)
 
-# Commande warn
-@bot.command(name='warn')
-@admin_only()
-async def warn_member(ctx, member: discord.Member, *, reason="Aucune raison spécifiée"):
-    """Avertir un membre"""
-    embed = discord.Embed(
-        title="⚠️ Avertissement",
-        description=f"{member.mention} a reçu un avertissement",
-        color=discord.Color.yellow()
-    )
-    embed.add_field(name="Raison", value=reason, inline=False)
-    embed.add_field(name="Modérateur", value=ctx.author.mention, inline=True)
+@bot.tree.command(name="setlogs", description="Configurer le canal de logs")
+@app_commands.describe(
+    channel="Le canal où envoyer les logs"
+)
+async def setlogs_slash(interaction: discord.Interaction, channel: discord.TextChannel):
+    if not interaction.user.guild_permissions.administrator:
+        await interaction.response.send_message("❌ Cette commande est réservée aux administrateurs.", ephemeral=True)
+        return
     
-    await ctx.send(embed=embed)
-    await log_action("warn", ctx.author, member, reason)
+    global LOG_CHANNEL_ID
+    LOG_CHANNEL_ID = channel.id
+    
+    embed = discord.Embed(
+        title="✅ Canal de logs configuré",
+        description=f"Les logs seront maintenant envoyés dans {channel.mention}",
+        color=discord.Color.green()
+    )
+    await interaction.response.send_message(embed=embed)
+    await log_action("Configuration", interaction.user, channel=channel)
 
-# Commande info serveur
-@bot.command(name='serverinfo')
-async def server_info(ctx):
-    """Afficher les informations du serveur"""
-    guild = ctx.guild
+@bot.tree.command(name="maintenance", description="Activer le mode maintenance")
+@app_commands.describe(
+    reason="Raison de la maintenance"
+)
+async def maintenance_slash(interaction: discord.Interaction, reason: str = "Maintenance en cours"):
+    if not interaction.user.guild_permissions.administrator:
+        await interaction.response.send_message("❌ Cette commande est réservée aux administrateurs.", ephemeral=True)
+        return
+    
+    global MAINTENANCE_MODE, MAINTENANCE_REASON
+    MAINTENANCE_MODE = True
+    MAINTENANCE_REASON = reason
+    
+    embed = discord.Embed(
+        title="🔧 Mode maintenance activé",
+        description=f"Le serveur est maintenant en mode maintenance.\n**Raison:** {reason}",
+        color=discord.Color.orange()
+    )
+    embed.add_field(name="Activé par", value=interaction.user.mention, inline=True)
+    
+    await interaction.response.send_message(embed=embed)
+    
+    for channel in interaction.guild.text_channels:
+        try:
+            if channel.permissions_for(interaction.guild.me).send_messages and channel != interaction.channel:
+                await channel.send(embed=embed)
+        except:
+            continue
+    
+    await log_action("maintenance_enable", interaction.user, reason=reason)
+
+@bot.tree.command(name="maintenance_off", description="Désactiver le mode maintenance")
+async def maintenance_off_slash(interaction: discord.Interaction):
+    if not interaction.user.guild_permissions.administrator:
+        await interaction.response.send_message("❌ Cette commande est réservée aux administrateurs.", ephemeral=True)
+        return
+    
+    global MAINTENANCE_MODE, MAINTENANCE_REASON
+    MAINTENANCE_MODE = False
+    old_reason = MAINTENANCE_REASON
+    MAINTENANCE_REASON = ""
+    
+    embed = discord.Embed(
+        title="✅ Mode maintenance désactivé",
+        description="Le serveur est de nouveau opérationnel!",
+        color=discord.Color.green()
+    )
+    embed.add_field(name="Désactivé par", value=interaction.user.mention, inline=True)
+    
+    await interaction.response.send_message(embed=embed)
+    
+    for channel in interaction.guild.text_channels:
+        try:
+            if channel.permissions_for(interaction.guild.me).send_messages and channel != interaction.channel:
+                await channel.send(embed=embed)
+        except:
+            continue
+    
+    await log_action("maintenance_disable", interaction.user, reason=f"Fin de: {old_reason}")
+
+@bot.tree.command(name="serverinfo", description="Afficher les informations du serveur")
+async def serverinfo_slash(interaction: discord.Interaction):
+    guild = interaction.guild
     
     embed = discord.Embed(
         title=f"📊 Informations - {guild.name}",
@@ -332,74 +416,63 @@ async def server_info(ctx):
     embed.add_field(name="Rôles", value=len(guild.roles), inline=True)
     embed.add_field(name="Créé le", value=guild.created_at.strftime("%d/%m/%Y"), inline=True)
     
-    await ctx.send(embed=embed)
+    await interaction.response.send_message(embed=embed)
 
-# Commandes de maintenance
-@bot.command(name='maintenance')
-@admin_only()
-async def enable_maintenance(ctx, *, reason="Maintenance en cours"):
-    """Activer le mode maintenance (bloque les commandes pour les non-admins)"""
-    global MAINTENANCE_MODE, MAINTENANCE_REASON
-    MAINTENANCE_MODE = True
-    MAINTENANCE_REASON = reason
-    
+@bot.tree.command(name="commands", description="Afficher toutes les commandes disponibles")
+async def commands_slash(interaction: discord.Interaction):
     embed = discord.Embed(
-        title="🔧 Mode maintenance activé",
-        description=f"Le serveur est maintenant en mode maintenance.\n**Raison:** {reason}",
-        color=discord.Color.orange()
+        title="🤖 Commandes du Bot de Sécurité",
+        description="Voici toutes les commandes disponibles:",
+        color=discord.Color.blue()
     )
-    embed.add_field(name="Activé par", value=ctx.author.mention, inline=True)
     
-    # Envoyer dans tous les canaux textuels
-    for channel in ctx.guild.text_channels:
-        try:
-            if channel.permissions_for(ctx.guild.me).send_messages:
-                await channel.send(embed=embed)
-        except:
-            continue
+    if interaction.user.guild_permissions.administrator:
+        moderation_commands = [
+            ("/kick", "Exclure un membre du serveur"),
+            ("/ban", "Bannir un membre du serveur"),
+            ("/unban", "Débannir un utilisateur"),
+            ("/mute", "Mettre un membre en timeout"),
+            ("/unmute", "Retirer le timeout d'un membre"),
+            ("/warn", "Avertir un membre"),
+            ("/clear", "Supprimer des messages")
+        ]
+        
+        system_commands = [
+            ("/logs", "Voir les logs de modération"),
+            ("/setlogs", "Configurer le canal de logs"),
+            ("/maintenance", "Activer le mode maintenance"),
+            ("/maintenance_off", "Désactiver le mode maintenance"),
+            ("/commands", "Afficher cette liste")
+        ]
+        
+        embed.add_field(name="🔨 Modération (Admin seulement)", value="\n".join([f"`{cmd}` - {desc}" for cmd, desc in moderation_commands]), inline=False)
+        embed.add_field(name="⚙️ Système (Admin seulement)", value="\n".join([f"`{cmd}` - {desc}" for cmd, desc in system_commands]), inline=False)
+        embed.add_field(name="📊 Public", value="`/serverinfo` - Informations du serveur", inline=False)
+        embed.set_footer(text="Tapez / dans Discord pour voir toutes les commandes disponibles avec l'autocomplétion!")
+    else:
+        embed.add_field(
+            name="Commandes disponibles",
+            value="`/serverinfo` - Voir les informations du serveur\n`/commands` - Afficher cette aide",
+            inline=False
+        )
+        embed.add_field(
+            name="Note",
+            value="Les commandes de modération sont réservées aux administrateurs du serveur.",
+            inline=False
+        )
     
-    await log_action("maintenance_enable", ctx.author, reason=reason)
-
-@bot.command(name='maintenance_off')
-@admin_only()
-async def disable_maintenance(ctx):
-    """Désactiver le mode maintenance"""
-    global MAINTENANCE_MODE, MAINTENANCE_REASON
-    MAINTENANCE_MODE = False
-    old_reason = MAINTENANCE_REASON
-    MAINTENANCE_REASON = ""
-    
-    embed = discord.Embed(
-        title="✅ Mode maintenance désactivé",
-        description="Le serveur est de nouveau opérationnel!",
-        color=discord.Color.green()
-    )
-    embed.add_field(name="Désactivé par", value=ctx.author.mention, inline=True)
-    
-    # Envoyer dans tous les canaux textuels
-    for channel in ctx.guild.text_channels:
-        try:
-            if channel.permissions_for(ctx.guild.me).send_messages:
-                await channel.send(embed=embed)
-        except:
-            continue
-    
-    await log_action("maintenance_disable", ctx.author, reason=f"Fin de: {old_reason}")
+    await interaction.response.send_message(embed=embed, ephemeral=True)
 
 # Événement pour bloquer les messages pendant la maintenance
 @bot.event
 async def on_message(message):
-    # Ignorer les messages du bot
     if message.author == bot.user:
         return
     
-    # Si en maintenance et que l'utilisateur n'est pas admin
     if MAINTENANCE_MODE and not message.author.guild_permissions.administrator:
         if not message.content.startswith(bot.command_prefix):
-            # Supprimer le message
             try:
                 await message.delete()
-                # Envoyer un DM à l'utilisateur
                 embed = discord.Embed(
                     title="🔧 Serveur en maintenance",
                     description=f"Votre message a été supprimé car le serveur est en maintenance.\n**Raison:** {MAINTENANCE_REASON}",
@@ -410,85 +483,7 @@ async def on_message(message):
                 pass
         return
     
-    # Traiter les commandes normalement
     await bot.process_commands(message)
-
-# Commande d'aide pour les administrateurs
-@bot.command(name='admin_commands')
-@admin_only()
-async def admin_commands(ctx):
-    """Répertorier toutes les commandes d'administration disponibles"""
-    embed = discord.Embed(
-        title="👑 Commandes d'administration",
-        description="Voici toutes les commandes réservées aux administrateurs:",
-        color=discord.Color.gold()
-    )
-    
-    moderation_commands = [
-        ("!kick <@membre> [raison]", "Exclure un membre du serveur"),
-        ("!ban <@membre> [raison]", "Bannir un membre du serveur"),
-        ("!unban <user_id> [raison]", "Débannir un utilisateur"),
-        ("!mute <@membre> [minutes] [raison]", "Mettre un membre en timeout"),
-        ("!unmute <@membre> [raison]", "Retirer le timeout d'un membre"),
-        ("!warn <@membre> [raison]", "Avertir un membre"),
-        ("!clear [nombre]", "Supprimer des messages (max 100)")
-    ]
-    
-    system_commands = [
-        ("!logs [nombre]", "Voir les logs de modération"),
-        ("!setlogs #canal", "Configurer le canal de logs"),
-        ("!maintenance [raison]", "🔧 Activer le mode maintenance"),
-        ("!maintenance_off", "✅ Désactiver le mode maintenance"),
-        ("!admin_commands", "Afficher cette liste de commandes")
-    ]
-    
-    public_commands = [
-        ("!serverinfo", "Informations publiques du serveur")
-    ]
-    
-    embed.add_field(name="🔨 Modération", value="\n".join([f"`{cmd}` - {desc}" for cmd, desc in moderation_commands]), inline=False)
-    embed.add_field(name="⚙️ Système", value="\n".join([f"`{cmd}` - {desc}" for cmd, desc in system_commands]), inline=False)
-    embed.add_field(name="📊 Public", value="\n".join([f"`{cmd}` - {desc}" for cmd, desc in public_commands]), inline=False)
-    
-    embed.set_footer(text="Toutes les commandes sauf !serverinfo sont réservées aux administrateurs")
-    
-    await ctx.send(embed=embed)
-
-# Message d'information pour les non-administrateurs
-@bot.command(name='help')
-async def help_command(ctx):
-    """Afficher l'aide générale"""
-    if ctx.author.guild_permissions.administrator:
-        await admin_commands(ctx)
-    else:
-        embed = discord.Embed(
-            title="ℹ️ Bot de sécurité",
-            description="Ce bot est un système de sécurité et de modération pour le serveur.",
-            color=discord.Color.blue()
-        )
-        embed.add_field(
-            name="Commandes disponibles",
-            value="`!serverinfo` - Voir les informations du serveur\n`!help` - Afficher cette aide",
-            inline=False
-        )
-        embed.add_field(
-            name="Note",
-            value="Les commandes de modération sont réservées aux administrateurs du serveur.",
-            inline=False
-        )
-        await ctx.send(embed=embed)
-
-# Gestion des erreurs
-@bot.event
-async def on_command_error(ctx, error):
-    if isinstance(error, commands.MissingPermissions):
-        await ctx.send("❌ Vous n'avez pas les permissions nécessaires pour cette commande.")
-    elif isinstance(error, commands.MemberNotFound):
-        await ctx.send("❌ Membre non trouvé.")
-    elif isinstance(error, commands.BadArgument):
-        await ctx.send("❌ Argument invalide. Utilisez `!help_security` pour voir la syntaxe.")
-    else:
-        await ctx.send(f"❌ Une erreur s'est produite: {str(error)}")
 
 # Événements de modération automatique
 @bot.event
