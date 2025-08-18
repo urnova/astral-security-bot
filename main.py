@@ -10,9 +10,6 @@ import asyncio
 # Configuration
 intents = discord.Intents.default()
 intents.message_content = True
-intents.members = True
-intents.bans = True
-intents.guild_messages = True
 
 bot = commands.Bot(command_prefix='!', intents=intents)
 
