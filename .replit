@@ -10,3 +10,15 @@ channel = "stable-23_05"
 run = ["python", "main.py"]
 deploymentTarget = "gce"
 ignorePorts = true
+
+[workflows]
+runButton = "Run Security Bot"
+
+[[workflows.workflow]]
+name = "Run Security Bot"
+author = 42562363
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python main.py"
