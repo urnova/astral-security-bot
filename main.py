@@ -441,8 +441,48 @@ async def maintenance_on(interaction: discord.Interaction, reason: str = "Mainte
     MAINTENANCE_MODE = True
     MAINTENANCE_REASON = reason
     
-    embed = discord.Embed(title="🔧 MAINTENANCE ACTIVÉE", description=f"Raison: {reason}", color=0xffa500)
-    await interaction.response.send_message(embed=embed)
+    await interaction.response.send_message("🔧 **INITIALISATION DU MODE MAINTENANCE...**", ephemeral=True)
+    
+    try:
+        # Créer l'embed cinématique de maintenance
+        maintenance_embed = discord.Embed(
+            title="🚧 ⚠️ **MAINTENANCE EN COURS** ⚠️ 🚧",
+            description=f"```diff\n- SERVEUR EN MAINTENANCE TECHNIQUE\n- ACCÈS UTILISATEUR SUSPENDU\n- INTERVENTIONS ADMINISTRATIVES EN COURS\n```\n\n**🔧 RAISON:** `{reason}`\n**⚙️ STATUT:** `MAINTENANCE ACTIVE`\n**⏰ DÉBUT:** <t:{int(datetime.now().timestamp())}:F>\n**👨‍💻 TECHNICIEN:** {interaction.user.mention}",
+            color=0xffa500
+        )
+        maintenance_embed.set_image(url="https://media.giphy.com/media/3oKIPnAiaMCws8nOsE/giphy.gif")
+        maintenance_embed.set_thumbnail(url="https://media.giphy.com/media/xTiTnHXbRoaZ1B1Mo8/giphy.gif")
+        maintenance_embed.add_field(
+            name="⚙️ **OPÉRATIONS EN COURS**",
+            value="```yaml\n🔧 Maintenance système active\n🛠️ Interventions techniques\n🔄 Optimisations serveur\n⏸️ Communications suspendues```",
+            inline=False
+        )
+        maintenance_embed.add_field(
+            name="🚫 **RESTRICTIONS ACTIVES**",
+            value="```css\n[BLOQUÉ] Messages utilisateurs\n[AUTORISÉ] Communications admin\n[ACTIF] Surveillance système\n[STANDBY] Fonctions normales```",
+            inline=False
+        )
+        maintenance_embed.add_field(
+            name="📋 **INFORMATIONS**",
+            value=f"```fix\nDurée estimée: En cours d'évaluation\nImpact: Communications temporairement suspendues\nContact: Équipe administrative disponible```",
+            inline=False
+        )
+        maintenance_embed.set_footer(text="🔧 SYSTÈME DE MAINTENANCE ASTRAL | MODE TECHNIQUE ACTIVÉ", icon_url="https://cdn.discordapp.com/emojis/1234567890123456789.png")
+        
+        # Envoyer dans tous les canaux texte
+        for channel in interaction.guild.text_channels:
+            try:
+                await channel.send("🚧" * 10)
+                await channel.send(embed=maintenance_embed)
+                await channel.send("⚙️" * 10)
+            except:
+                pass
+        
+        # Confirmer dans le canal de commande
+        await interaction.followup.send(f"✅ **MODE MAINTENANCE ACTIVÉ** - Serveur en maintenance technique", ephemeral=True)
+        
+    except Exception as e:
+        await interaction.followup.send("❌ Erreur lors de l'activation maintenance", ephemeral=True)
 
 @bot.tree.command(name="maintenance_off", description="Mode maintenance OFF")
 async def maintenance_off(interaction: discord.Interaction):
@@ -452,8 +492,49 @@ async def maintenance_off(interaction: discord.Interaction):
     global MAINTENANCE_MODE
     MAINTENANCE_MODE = False
     
-    embed = discord.Embed(title="✅ MAINTENANCE DÉSACTIVÉE", description="Serveur opérationnel", color=0x00ff00)
-    await interaction.response.send_message(embed=embed)
+    await interaction.response.send_message("✅ **FINALISATION DE LA MAINTENANCE...**", ephemeral=True)
+    
+    try:
+        # Créer l'embed cinématique de fin de maintenance
+        end_maintenance_embed = discord.Embed(
+            title="🎉 ✨ **MAINTENANCE TERMINÉE** ✨ 🎉",
+            description=f"```diff\n+ MAINTENANCE TECHNIQUE COMPLÉTÉE\n+ SERVEUR PLEINEMENT OPÉRATIONNEL\n+ COMMUNICATIONS RÉTABLIES\n```\n\n**✅ STATUT:** `OPÉRATIONNEL`\n**⏰ FIN:** <t:{int(datetime.now().timestamp())}:F>\n**👨‍💻 TECHNICIEN:** {interaction.user.mention}\n**🔄 RÉSULTAT:** `Maintenance réussie - Système optimisé`",
+            color=0x00ff66
+        )
+        end_maintenance_embed.set_image(url="https://media.giphy.com/media/26u4cqiYI30juCOGY/giphy.gif")
+        end_maintenance_embed.set_thumbnail(url="https://media.giphy.com/media/3o7abKhOpu0NwenH3O/giphy.gif")
+        end_maintenance_embed.add_field(
+            name="🎊 **MAINTENANCE RÉUSSIE**",
+            value="```yaml\n✅ Système entièrement opérationnel\n✅ Communications restaurées\n✅ Optimisations appliquées\n✅ Serveur stabilisé```",
+            inline=False
+        )
+        end_maintenance_embed.add_field(
+            name="🌟 **AMÉLIORATIONS APPORTÉES**",
+            value="```css\n[OPTIMISÉ] Performances système\n[SÉCURISÉ] Protocoles de sécurité\n[STABLE] Fonctionnement optimal\n[DISPONIBLE] Toutes fonctionnalités```",
+            inline=False
+        )
+        end_maintenance_embed.add_field(
+            name="📢 **ANNONCE**",
+            value="```fix\nLe serveur est maintenant pleinement fonctionnel !\nMerci de votre patience pendant la maintenance.\nToutes les fonctionnalités sont disponibles.```",
+            inline=False
+        )
+        end_maintenance_embed.set_footer(text="✅ SYSTÈME DE MAINTENANCE ASTRAL | SERVEUR OPÉRATIONNEL", icon_url="https://cdn.discordapp.com/emojis/1234567890123456789.png")
+        
+        # Envoyer dans tous les canaux texte
+        for channel in interaction.guild.text_channels:
+            try:
+                await channel.send("🎉" * 10)
+                await channel.send(embed=end_maintenance_embed)
+                await channel.send("🎊" * 10)
+                await channel.send("**🚀 LE SERVEUR EST DE RETOUR ! BIENVENUE ! 🚀**")
+            except:
+                pass
+        
+        # Confirmer dans le canal de commande
+        await interaction.followup.send(f"✅ **MAINTENANCE TERMINÉE** - Serveur pleinement opérationnel", ephemeral=True)
+        
+    except Exception as e:
+        await interaction.followup.send("❌ Erreur lors de la fin de maintenance", ephemeral=True)
 
 @bot.tree.command(name="setlogchannel", description="Définir le canal de logs")
 async def setlogchannel(interaction: discord.Interaction, channel: discord.TextChannel):
