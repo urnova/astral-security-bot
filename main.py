@@ -37,6 +37,20 @@ def maintenance_check():
         return True
     return commands.check(predicate)
 
+# Check global pour les administrateurs
+def admin_only():
+    async def predicate(ctx):
+        if not ctx.author.guild_permissions.administrator:
+            embed = discord.Embed(
+                title="❌ Accès refusé",
+                description="Cette commande est réservée aux administrateurs du serveur.",
+                color=discord.Color.red()
+            )
+            await ctx.send(embed=embed)
+            return False
+        return True
+    return commands.check(predicate)
+
 # Événement de démarrage
 @bot.event
 async def on_ready():
@@ -82,7 +96,7 @@ async def log_action(action, user, target=None, reason=None, channel=None):
 
 # Configuration du canal de logs
 @bot.command(name='setlogs')
-@commands.has_permissions(administrator=True)
+@admin_only()
 async def set_log_channel(ctx, channel: discord.TextChannel):
     """Configure le canal pour les logs de modération"""
     global LOG_CHANNEL_ID
@@ -98,7 +112,7 @@ async def set_log_channel(ctx, channel: discord.TextChannel):
 
 # Commande kick
 @bot.command(name='kick')
-@commands.has_permissions(kick_members=True)
+@admin_only()
 @maintenance_check()
 async def kick_member(ctx, member: discord.Member, *, reason="Aucune raison spécifiée"):
     """Exclure un membre du serveur"""
@@ -123,7 +137,7 @@ async def kick_member(ctx, member: discord.Member, *, reason="Aucune raison spé
 
 # Commande ban
 @bot.command(name='ban')
-@commands.has_permissions(ban_members=True)
+@admin_only()
 @maintenance_check()
 async def ban_member(ctx, member: discord.Member, *, reason="Aucune raison spécifiée"):
     """Bannir un membre du serveur"""
@@ -148,7 +162,7 @@ async def ban_member(ctx, member: discord.Member, *, reason="Aucune raison spéc
 
 # Commande unban
 @bot.command(name='unban')
-@commands.has_permissions(ban_members=True)
+@admin_only()
 @maintenance_check()
 async def unban_member(ctx, user_id: int, *, reason="Aucune raison spécifiée"):
     """Débannir un utilisateur"""
@@ -174,7 +188,7 @@ async def unban_member(ctx, user_id: int, *, reason="Aucune raison spécifiée")
 
 # Commande mute (timeout)
 @bot.command(name='mute')
-@commands.has_permissions(moderate_members=True)
+@admin_only()
 @maintenance_check()
 async def mute_member(ctx, member: discord.Member, duration: int = 10, *, reason="Aucune raison spécifiée"):
     """Mettre un membre en timeout (durée en minutes)"""
@@ -200,7 +214,7 @@ async def mute_member(ctx, member: discord.Member, duration: int = 10, *, reason
 
 # Commande unmute
 @bot.command(name='unmute')
-@commands.has_permissions(moderate_members=True)
+@admin_only()
 async def unmute_member(ctx, member: discord.Member, *, reason="Aucune raison spécifiée"):
     """Retirer le timeout d'un membre"""
     try:
@@ -222,7 +236,7 @@ async def unmute_member(ctx, member: discord.Member, *, reason="Aucune raison sp
 
 # Commande clear (supprimer messages)
 @bot.command(name='clear')
-@commands.has_permissions(manage_messages=True)
+@admin_only()
 async def clear_messages(ctx, amount: int = 10):
     """Supprimer un nombre de messages (max 100)"""
     if amount > 100:
@@ -250,7 +264,7 @@ async def clear_messages(ctx, amount: int = 10):
 
 # Commande pour voir les logs
 @bot.command(name='logs')
-@commands.has_permissions(view_audit_log=True)
+@admin_only()
 async def view_logs(ctx, limit: int = 10):
     """Afficher les derniers logs de modération"""
     if not logs_data:
@@ -287,7 +301,7 @@ async def view_logs(ctx, limit: int = 10):
 
 # Commande warn
 @bot.command(name='warn')
-@commands.has_permissions(kick_members=True)
+@admin_only()
 async def warn_member(ctx, member: discord.Member, *, reason="Aucune raison spécifiée"):
     """Avertir un membre"""
     embed = discord.Embed(
@@ -322,7 +336,7 @@ async def server_info(ctx):
 
 # Commandes de maintenance
 @bot.command(name='maintenance')
-@commands.has_permissions(administrator=True)
+@admin_only()
 async def enable_maintenance(ctx, *, reason="Maintenance en cours"):
     """Activer le mode maintenance (bloque les commandes pour les non-admins)"""
     global MAINTENANCE_MODE, MAINTENANCE_REASON
@@ -347,7 +361,7 @@ async def enable_maintenance(ctx, *, reason="Maintenance en cours"):
     await log_action("maintenance_enable", ctx.author, reason=reason)
 
 @bot.command(name='maintenance_off')
-@commands.has_permissions(administrator=True)
+@admin_only()
 async def disable_maintenance(ctx):
     """Désactiver le mode maintenance"""
     global MAINTENANCE_MODE, MAINTENANCE_REASON
@@ -399,35 +413,70 @@ async def on_message(message):
     # Traiter les commandes normalement
     await bot.process_commands(message)
 
-# Commande d'aide
-@bot.command(name='help_security')
-async def help_security(ctx):
-    """Afficher toutes les commandes de sécurité disponibles"""
+# Commande d'aide pour les administrateurs
+@bot.command(name='admin_commands')
+@admin_only()
+async def admin_commands(ctx):
+    """Répertorier toutes les commandes d'administration disponibles"""
     embed = discord.Embed(
-        title="🛡️ Commandes de sécurité",
-        description="Voici toutes les commandes disponibles:",
-        color=discord.Color.blue()
+        title="👑 Commandes d'administration",
+        description="Voici toutes les commandes réservées aux administrateurs:",
+        color=discord.Color.gold()
     )
     
-    commands_list = [
-        ("!kick <@membre> [raison]", "Exclure un membre"),
-        ("!ban <@membre> [raison]", "Bannir un membre"),
+    moderation_commands = [
+        ("!kick <@membre> [raison]", "Exclure un membre du serveur"),
+        ("!ban <@membre> [raison]", "Bannir un membre du serveur"),
         ("!unban <user_id> [raison]", "Débannir un utilisateur"),
-        ("!mute <@membre> [minutes] [raison]", "Mettre en timeout"),
-        ("!unmute <@membre> [raison]", "Retirer le timeout"),
-        ("!clear [nombre]", "Supprimer des messages"),
+        ("!mute <@membre> [minutes] [raison]", "Mettre un membre en timeout"),
+        ("!unmute <@membre> [raison]", "Retirer le timeout d'un membre"),
         ("!warn <@membre> [raison]", "Avertir un membre"),
-        ("!logs [nombre]", "Voir les logs de modération"),
-        ("!setlogs #canal", "Configurer le canal de logs"),
-        ("!maintenance [raison]", "🔧 Activer la maintenance (Admin)"),
-        ("!maintenance_off", "✅ Désactiver la maintenance (Admin)"),
-        ("!serverinfo", "Informations du serveur")
+        ("!clear [nombre]", "Supprimer des messages (max 100)")
     ]
     
-    for command, description in commands_list:
-        embed.add_field(name=command, value=description, inline=False)
+    system_commands = [
+        ("!logs [nombre]", "Voir les logs de modération"),
+        ("!setlogs #canal", "Configurer le canal de logs"),
+        ("!maintenance [raison]", "🔧 Activer le mode maintenance"),
+        ("!maintenance_off", "✅ Désactiver le mode maintenance"),
+        ("!admin_commands", "Afficher cette liste de commandes")
+    ]
+    
+    public_commands = [
+        ("!serverinfo", "Informations publiques du serveur")
+    ]
+    
+    embed.add_field(name="🔨 Modération", value="\n".join([f"`{cmd}` - {desc}" for cmd, desc in moderation_commands]), inline=False)
+    embed.add_field(name="⚙️ Système", value="\n".join([f"`{cmd}` - {desc}" for cmd, desc in system_commands]), inline=False)
+    embed.add_field(name="📊 Public", value="\n".join([f"`{cmd}` - {desc}" for cmd, desc in public_commands]), inline=False)
+    
+    embed.set_footer(text="Toutes les commandes sauf !serverinfo sont réservées aux administrateurs")
     
     await ctx.send(embed=embed)
+
+# Message d'information pour les non-administrateurs
+@bot.command(name='help')
+async def help_command(ctx):
+    """Afficher l'aide générale"""
+    if ctx.author.guild_permissions.administrator:
+        await admin_commands(ctx)
+    else:
+        embed = discord.Embed(
+            title="ℹ️ Bot de sécurité",
+            description="Ce bot est un système de sécurité et de modération pour le serveur.",
+            color=discord.Color.blue()
+        )
+        embed.add_field(
+            name="Commandes disponibles",
+            value="`!serverinfo` - Voir les informations du serveur\n`!help` - Afficher cette aide",
+            inline=False
+        )
+        embed.add_field(
+            name="Note",
+            value="Les commandes de modération sont réservées aux administrateurs du serveur.",
+            inline=False
+        )
+        await ctx.send(embed=embed)
 
 # Gestion des erreurs
 @bot.event
