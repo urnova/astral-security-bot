@@ -840,27 +840,32 @@ async def commands_list(interaction: discord.Interaction):
         embed3 = discord.Embed(title="🛡️ SÉCURITÉ AVANCÉE", color=0xff0000)
         embed3.add_field(
             name="/lockdown [raison]", 
-            value="Verrouiller TOUT le serveur (personne ne peut parler)", 
+            value="🚨 Verrouiller TOUT le serveur avec alerte ROUGE dans tous les canaux", 
             inline=False
         )
         embed3.add_field(
             name="/unlock", 
-            value="Déverrouiller le serveur (rétablir la communication)", 
+            value="🎉 Déverrouiller le serveur avec célébration dans tous les canaux", 
             inline=False
         )
         embed3.add_field(
             name="/nuke", 
-            value="SUPPRIMER TOUS les messages du canal actuel (recrée le canal)", 
+            value="💥 SUPPRIMER TOUS les messages + compte à rebours dramatique", 
             inline=False
         )
         embed3.add_field(
             name="/massban [IDs séparés par espaces] [raison]", 
-            value="Bannir plusieurs utilisateurs en une fois avec leurs IDs", 
+            value="🔨 Bannir plusieurs utilisateurs en une fois avec leurs IDs", 
             inline=False
         )
         embed3.add_field(
             name="/antiraid [true/false]", 
-            value="Activer/désactiver protection auto (ban comptes récents <7j)", 
+            value="🛡️ Protection auto (ban comptes récents <7j)", 
+            inline=False
+        )
+        embed3.add_field(
+            name="🎭 Effets cinématiques :", 
+            value="• Lockdown: Embeds rouges + GIFs d'alerte\n• Unlock: Embeds verts + GIFs de célébration\n• Nuke: Countdown + explosion visuelle\n• Annonces dans TOUS les canaux texte", 
             inline=False
         )
         embeds.append(embed3)
@@ -916,28 +921,38 @@ async def commands_list(interaction: discord.Interaction):
             value="Envoyer un message privé officiel à un membre", 
             inline=False
         )
+        embed5.add_field(
+            name="📋 Fonctionnalités avancées :", 
+            value="• Tous les messages sont loggés automatiquement\n• Confirmations privées pour l'admin\n• Embeds avec timestamp et footer officiel\n• Support couleurs personnalisées (format hex)", 
+            inline=False
+        )
         embeds.append(embed5)
         
         # Embed 6: Système
         embed6 = discord.Embed(title="⚙️ SYSTÈME & CONFIGURATION", color=0xffa500)
         embed6.add_field(
             name="/maintenance [raison]", 
-            value="Activer mode maintenance (seuls les admins peuvent parler)", 
+            value="🚧 Activer mode maintenance avec annonce CINÉMATIQUE dans tous les canaux", 
             inline=False
         )
         embed6.add_field(
             name="/maintenance_off", 
-            value="Désactiver le mode maintenance", 
+            value="✅ Désactiver mode maintenance avec célébration dans tous les canaux", 
             inline=False
         )
         embed6.add_field(
             name="/setlogchannel [canal]", 
-            value="Définir le canal où les logs seront envoyés", 
+            value="Définir le canal où les logs automatiques seront envoyés", 
             inline=False
         )
         embed6.add_field(
             name="/serverinfo", 
             value="Afficher les informations détaillées du serveur", 
+            inline=False
+        )
+        embed6.add_field(
+            name="🎬 Effets visuels :", 
+            value="• Maintenance: Embeds orange avec GIFs techniques\n• Fin maintenance: Embeds verts avec GIFs festifs\n• Messages dans TOUS les canaux comme lockdown\n• Timestamps Discord en temps réel", 
             inline=False
         )
         embeds.append(embed6)
