@@ -390,40 +390,180 @@ async def userinfo(interaction: discord.Interaction, member: discord.Member = No
     
     await interaction.response.send_message(embed=embed)
 
-@bot.tree.command(name="commands", description="Liste des commandes")
+@bot.tree.command(name="commands", description="Liste détaillée des commandes")
 async def commands_list(interaction: discord.Interaction):
-    embed = discord.Embed(title="🤖 Commandes du Bot", color=0x0099ff)
+    embeds = []
     
     if interaction.user.guild_permissions.administrator:
-        embed.add_field(
-            name="🔨 Modération", 
-            value="/kick /ban /unban /mute /unmute /clear", 
+        # Embed 1: Modération de base
+        embed1 = discord.Embed(title="🔨 MODÉRATION DE BASE", color=0xff6b6b)
+        embed1.add_field(
+            name="/kick [membre] [raison]", 
+            value="Exclure un membre du serveur (il peut revenir avec une invitation)", 
             inline=False
         )
-        embed.add_field(
-            name="⚠️ Avertissements", 
-            value="/warn /warns /unwarn", 
+        embed1.add_field(
+            name="/ban [membre] [raison]", 
+            value="Bannir définitivement un membre (ne peut plus rejoindre)", 
             inline=False
         )
-        embed.add_field(
-            name="🛡️ Sécurité", 
-            value="/lockdown /unlock /nuke /massban /antiraid", 
+        embed1.add_field(
+            name="/unban [ID_utilisateur] [raison]", 
+            value="Débannir un utilisateur avec son ID Discord", 
             inline=False
         )
-        embed.add_field(
-            name="🤖 Automod", 
-            value="/automod /addword /removeword /bannedwords", 
+        embed1.add_field(
+            name="/mute [membre] [minutes] [raison]", 
+            value="Timeout un membre (ne peut plus parler pendant X minutes)", 
             inline=False
         )
-        embed.add_field(
-            name="⚙️ Système", 
-            value="/maintenance /setlogchannel /serverinfo", 
+        embed1.add_field(
+            name="/unmute [membre]", 
+            value="Retirer le timeout d'un membre", 
+            inline=False
+        )
+        embed1.add_field(
+            name="/clear [nombre]", 
+            value="Supprimer X messages du canal (max 100)", 
+            inline=False
+        )
+        embeds.append(embed1)
+        
+        # Embed 2: Système d'avertissements
+        embed2 = discord.Embed(title="⚠️ SYSTÈME D'AVERTISSEMENTS", color=0xffff00)
+        embed2.add_field(
+            name="/warn [membre] [raison]", 
+            value="Donner un avertissement à un membre (ban auto à 3 warns)", 
+            inline=False
+        )
+        embed2.add_field(
+            name="/warns [membre]", 
+            value="Voir tous les avertissements d'un membre", 
+            inline=False
+        )
+        embed2.add_field(
+            name="/unwarn [membre] [numéro]", 
+            value="Retirer un avertissement spécifique d'un membre", 
+            inline=False
+        )
+        embeds.append(embed2)
+        
+        # Embed 3: Sécurité avancée
+        embed3 = discord.Embed(title="🛡️ SÉCURITÉ AVANCÉE", color=0xff0000)
+        embed3.add_field(
+            name="/lockdown [raison]", 
+            value="Verrouiller TOUT le serveur (personne ne peut parler)", 
+            inline=False
+        )
+        embed3.add_field(
+            name="/unlock", 
+            value="Déverrouiller le serveur (rétablir la communication)", 
+            inline=False
+        )
+        embed3.add_field(
+            name="/nuke", 
+            value="SUPPRIMER TOUS les messages du canal actuel (recrée le canal)", 
+            inline=False
+        )
+        embed3.add_field(
+            name="/massban [IDs séparés par espaces] [raison]", 
+            value="Bannir plusieurs utilisateurs en une fois avec leurs IDs", 
+            inline=False
+        )
+        embed3.add_field(
+            name="/antiraid [true/false]", 
+            value="Activer/désactiver protection auto (ban comptes récents <7j)", 
+            inline=False
+        )
+        embeds.append(embed3)
+        
+        # Embed 4: Automodération
+        embed4 = discord.Embed(title="🤖 AUTOMODÉRATION", color=0x9932cc)
+        embed4.add_field(
+            name="/automod [true/false]", 
+            value="Activer/désactiver la modération automatique", 
+            inline=False
+        )
+        embed4.add_field(
+            name="/addword [mot]", 
+            value="Ajouter un mot à la liste des mots interdits", 
+            inline=False
+        )
+        embed4.add_field(
+            name="/removeword [mot]", 
+            value="Retirer un mot de la liste des mots interdits", 
+            inline=False
+        )
+        embed4.add_field(
+            name="/bannedwords", 
+            value="Voir la liste complète des mots interdits", 
+            inline=False
+        )
+        embed4.add_field(
+            name="🔧 Protections automatiques :", 
+            value="• Anti-spam (timeout 5min si >10 msg/min)\n• Anti-mentions (max 5 mentions/msg)\n• Filtrage mots interdits\n• Blocage pendant maintenance", 
+            inline=False
+        )
+        embeds.append(embed4)
+        
+        # Embed 5: Système
+        embed5 = discord.Embed(title="⚙️ SYSTÈME & CONFIGURATION", color=0xffa500)
+        embed5.add_field(
+            name="/maintenance [raison]", 
+            value="Activer mode maintenance (seuls les admins peuvent parler)", 
+            inline=False
+        )
+        embed5.add_field(
+            name="/maintenance_off", 
+            value="Désactiver le mode maintenance", 
+            inline=False
+        )
+        embed5.add_field(
+            name="/setlogchannel [canal]", 
+            value="Définir le canal où les logs seront envoyés", 
+            inline=False
+        )
+        embed5.add_field(
+            name="/serverinfo", 
+            value="Afficher les informations détaillées du serveur", 
+            inline=False
+        )
+        embeds.append(embed5)
+    
+    # Embed pour tous les utilisateurs
+    embed_general = discord.Embed(title="📋 COMMANDES GÉNÉRALES", color=0x0099ff)
+    embed_general.add_field(
+        name="/commands", 
+        value="Afficher cette liste détaillée de toutes les commandes", 
+        inline=False
+    )
+    embed_general.add_field(
+        name="/userinfo [membre]", 
+        value="Voir les informations d'un utilisateur (ou vous-même si aucun membre spécifié)", 
+        inline=False
+    )
+    
+    if interaction.user.guild_permissions.administrator:
+        embed_general.add_field(
+            name="🔑 ACCÈS ADMIN", 
+            value="Vous avez accès à toutes les commandes de modération !", 
+            inline=False
+        )
+    else:
+        embed_general.add_field(
+            name="🚫 ACCÈS LIMITÉ", 
+            value="Vous n'avez accès qu'aux commandes générales", 
             inline=False
         )
     
-    embed.add_field(name="📋 Général", value="/commands /userinfo", inline=False)
+    embeds.append(embed_general)
     
-    await interaction.response.send_message(embed=embed, ephemeral=True)
+    # Envoyer le premier embed
+    await interaction.response.send_message(embed=embeds[0], ephemeral=True)
+    
+    # Envoyer les autres embeds
+    for embed in embeds[1:]:
+        await interaction.followup.send(embed=embed, ephemeral=True)
 
 # ÉVÉNEMENTS DE SÉCURITÉ
 @bot.event
