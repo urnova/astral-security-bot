@@ -500,6 +500,203 @@ async def userinfo(interaction: discord.Interaction, member: discord.Member = No
     
     await interaction.response.send_message(embed=embed)
 
+@bot.tree.command(name="say", description="Faire parler le bot")
+async def say(interaction: discord.Interaction, message: str, channel: discord.TextChannel = None):
+    if not interaction.user.guild_permissions.administrator:
+        return await interaction.response.send_message("❌ Commande admin uniquement", ephemeral=True)
+    
+    target_channel = channel or interaction.channel
+    
+    try:
+        await target_channel.send(message)
+        embed = discord.Embed(
+            title="✅ Message envoyé",
+            description=f"Message envoyé dans {target_channel.mention}",
+            color=0x00ff00
+        )
+        embed.add_field(name="Contenu", value=f"```{message[:1000]}```", inline=False)
+        embed.add_field(name="Expéditeur", value=interaction.user.mention, inline=True)
+        embed.add_field(name="Canal", value=target_channel.mention, inline=True)
+        
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+        
+        # Log dans le canal de logs si configuré
+        if LOG_CHANNEL_ID:
+            log_channel = bot.get_channel(LOG_CHANNEL_ID)
+            if log_channel and log_channel != target_channel:
+                log_embed = discord.Embed(
+                    title="📤 Message bot envoyé",
+                    description=f"Message envoyé via le bot dans {target_channel.mention}",
+                    color=0x0099ff
+                )
+                log_embed.add_field(name="Contenu", value=f"```{message[:1000]}```", inline=False)
+                log_embed.add_field(name="Administrateur", value=interaction.user.mention, inline=True)
+                log_embed.add_field(name="Heure", value=f"<t:{int(datetime.now().timestamp())}:F>", inline=True)
+                await log_channel.send(embed=log_embed)
+                
+    except Exception as e:
+        await interaction.response.send_message(f"❌ Erreur lors de l'envoi: {str(e)}", ephemeral=True)
+
+@bot.tree.command(name="embed", description="Envoyer un message embed via le bot")
+async def send_embed(interaction: discord.Interaction, title: str, description: str, channel: discord.TextChannel = None, color: str = "0x0099ff"):
+    if not interaction.user.guild_permissions.administrator:
+        return await interaction.response.send_message("❌ Commande admin uniquement", ephemeral=True)
+    
+    target_channel = channel or interaction.channel
+    
+    try:
+        # Convertir la couleur
+        try:
+            embed_color = int(color, 16) if color.startswith("0x") else int(color, 16)
+        except:
+            embed_color = 0x0099ff
+        
+        embed = discord.Embed(
+            title=title,
+            description=description,
+            color=embed_color,
+            timestamp=datetime.now()
+        )
+        embed.set_footer(text=f"Message officiel • {interaction.guild.name}")
+        
+        await target_channel.send(embed=embed)
+        
+        # Confirmation
+        confirm_embed = discord.Embed(
+            title="✅ Embed envoyé",
+            description=f"Embed envoyé dans {target_channel.mention}",
+            color=0x00ff00
+        )
+        confirm_embed.add_field(name="Titre", value=title, inline=False)
+        confirm_embed.add_field(name="Description", value=description[:1000], inline=False)
+        confirm_embed.add_field(name="Expéditeur", value=interaction.user.mention, inline=True)
+        
+        await interaction.response.send_message(embed=confirm_embed, ephemeral=True)
+        
+        # Log
+        if LOG_CHANNEL_ID:
+            log_channel = bot.get_channel(LOG_CHANNEL_ID)
+            if log_channel and log_channel != target_channel:
+                log_embed = discord.Embed(
+                    title="📤 Embed bot envoyé",
+                    description=f"Embed envoyé via le bot dans {target_channel.mention}",
+                    color=0x0099ff
+                )
+                log_embed.add_field(name="Titre", value=title, inline=False)
+                log_embed.add_field(name="Description", value=description[:1000], inline=False)
+                log_embed.add_field(name="Administrateur", value=interaction.user.mention, inline=True)
+                await log_channel.send(embed=log_embed)
+                
+    except Exception as e:
+        await interaction.response.send_message(f"❌ Erreur lors de l'envoi: {str(e)}", ephemeral=True)
+
+@bot.tree.command(name="announce", description="Envoyer une annonce officielle")
+async def announce(interaction: discord.Interaction, title: str, message: str, channel: discord.TextChannel = None, ping_everyone: bool = False):
+    if not interaction.user.guild_permissions.administrator:
+        return await interaction.response.send_message("❌ Commande admin uniquement", ephemeral=True)
+    
+    target_channel = channel or interaction.channel
+    
+    try:
+        # Créer l'embed d'annonce
+        announce_embed = discord.Embed(
+            title=f"📢 {title}",
+            description=message,
+            color=0xffd700,
+            timestamp=datetime.now()
+        )
+        announce_embed.set_footer(text=f"Annonce officielle • {interaction.guild.name}")
+        announce_embed.set_author(name="ANNONCE OFFICIELLE", icon_url=interaction.guild.icon.url if interaction.guild.icon else None)
+        
+        # Ajouter une image d'annonce
+        announce_embed.set_thumbnail(url="https://media.giphy.com/media/l0HlQoLBxzlnKRT8s/giphy.gif")
+        
+        # Envoyer avec ou sans ping
+        content = "@everyone" if ping_everyone else ""
+        
+        await target_channel.send("🔔" * 10)
+        await target_channel.send(content=content, embed=announce_embed)
+        await target_channel.send("🔔" * 10)
+        
+        # Confirmation
+        confirm_embed = discord.Embed(
+            title="✅ Annonce publiée",
+            description=f"Annonce envoyée dans {target_channel.mention}",
+            color=0x00ff00
+        )
+        confirm_embed.add_field(name="Titre", value=title, inline=False)
+        confirm_embed.add_field(name="Message", value=message[:1000], inline=False)
+        confirm_embed.add_field(name="Ping everyone", value="Oui" if ping_everyone else "Non", inline=True)
+        
+        await interaction.response.send_message(embed=confirm_embed, ephemeral=True)
+        
+        # Log
+        if LOG_CHANNEL_ID:
+            log_channel = bot.get_channel(LOG_CHANNEL_ID)
+            if log_channel and log_channel != target_channel:
+                log_embed = discord.Embed(
+                    title="📢 Annonce officielle publiée",
+                    description=f"Annonce publiée dans {target_channel.mention}",
+                    color=0xffd700
+                )
+                log_embed.add_field(name="Titre", value=title, inline=False)
+                log_embed.add_field(name="Message", value=message[:1000], inline=False)
+                log_embed.add_field(name="Administrateur", value=interaction.user.mention, inline=True)
+                log_embed.add_field(name="Ping everyone", value="Oui" if ping_everyone else "Non", inline=True)
+                await log_channel.send(embed=log_embed)
+                
+    except Exception as e:
+        await interaction.response.send_message(f"❌ Erreur lors de l'envoi: {str(e)}", ephemeral=True)
+
+@bot.tree.command(name="dm", description="Envoyer un MP à un utilisateur via le bot")
+async def send_dm(interaction: discord.Interaction, member: discord.Member, message: str):
+    if not interaction.user.guild_permissions.administrator:
+        return await interaction.response.send_message("❌ Commande admin uniquement", ephemeral=True)
+    
+    try:
+        # Créer l'embed pour le MP
+        dm_embed = discord.Embed(
+            title="📨 Message du serveur",
+            description=message,
+            color=0x0099ff,
+            timestamp=datetime.now()
+        )
+        dm_embed.set_footer(text=f"Message officiel de {interaction.guild.name}")
+        dm_embed.set_author(name=interaction.guild.name, icon_url=interaction.guild.icon.url if interaction.guild.icon else None)
+        
+        await member.send(embed=dm_embed)
+        
+        # Confirmation
+        confirm_embed = discord.Embed(
+            title="✅ MP envoyé",
+            description=f"Message privé envoyé à {member.mention}",
+            color=0x00ff00
+        )
+        confirm_embed.add_field(name="Contenu", value=f"```{message[:1000]}```", inline=False)
+        confirm_embed.add_field(name="Destinataire", value=member.mention, inline=True)
+        confirm_embed.add_field(name="Expéditeur", value=interaction.user.mention, inline=True)
+        
+        await interaction.response.send_message(embed=confirm_embed, ephemeral=True)
+        
+        # Log
+        if LOG_CHANNEL_ID:
+            log_channel = bot.get_channel(LOG_CHANNEL_ID)
+            if log_channel:
+                log_embed = discord.Embed(
+                    title="📨 MP bot envoyé",
+                    description=f"Message privé envoyé via le bot à {member.mention}",
+                    color=0x0099ff
+                )
+                log_embed.add_field(name="Contenu", value=f"```{message[:1000]}```", inline=False)
+                log_embed.add_field(name="Destinataire", value=member.mention, inline=True)
+                log_embed.add_field(name="Administrateur", value=interaction.user.mention, inline=True)
+                await log_channel.send(embed=log_embed)
+                
+    except discord.Forbidden:
+        await interaction.response.send_message(f"❌ Impossible d'envoyer un MP à {member.mention} (MP fermés)", ephemeral=True)
+    except Exception as e:
+        await interaction.response.send_message(f"❌ Erreur lors de l'envoi: {str(e)}", ephemeral=True)
+
 @bot.tree.command(name="commands", description="Liste détaillée des commandes")
 async def commands_list(interaction: discord.Interaction):
     embeds = []
@@ -616,29 +813,53 @@ async def commands_list(interaction: discord.Interaction):
         )
         embeds.append(embed4)
         
-        # Embed 5: Système
-        embed5 = discord.Embed(title="⚙️ SYSTÈME & CONFIGURATION", color=0xffa500)
+        # Embed 5: Messages via bot
+        embed5 = discord.Embed(title="📤 MESSAGES VIA BOT", color=0x00aaff)
         embed5.add_field(
+            name="/say [message] [canal]", 
+            value="Faire dire un message au bot dans un canal spécifique", 
+            inline=False
+        )
+        embed5.add_field(
+            name="/embed [titre] [description] [canal] [couleur]", 
+            value="Envoyer un message embed stylisé via le bot", 
+            inline=False
+        )
+        embed5.add_field(
+            name="/announce [titre] [message] [canal] [ping_everyone]", 
+            value="Publier une annonce officielle avec style et émojis", 
+            inline=False
+        )
+        embed5.add_field(
+            name="/dm [membre] [message]", 
+            value="Envoyer un message privé officiel à un membre", 
+            inline=False
+        )
+        embeds.append(embed5)
+        
+        # Embed 6: Système
+        embed6 = discord.Embed(title="⚙️ SYSTÈME & CONFIGURATION", color=0xffa500)
+        embed6.add_field(
             name="/maintenance [raison]", 
             value="Activer mode maintenance (seuls les admins peuvent parler)", 
             inline=False
         )
-        embed5.add_field(
+        embed6.add_field(
             name="/maintenance_off", 
             value="Désactiver le mode maintenance", 
             inline=False
         )
-        embed5.add_field(
+        embed6.add_field(
             name="/setlogchannel [canal]", 
             value="Définir le canal où les logs seront envoyés", 
             inline=False
         )
-        embed5.add_field(
+        embed6.add_field(
             name="/serverinfo", 
             value="Afficher les informations détaillées du serveur", 
             inline=False
         )
-        embeds.append(embed5)
+        embeds.append(embed6)
     
     # Embed pour tous les utilisateurs
     embed_general = discord.Embed(title="📋 COMMANDES GÉNÉRALES", color=0x0099ff)
