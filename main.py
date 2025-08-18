@@ -191,28 +191,99 @@ async def lockdown(interaction: discord.Interaction, reason: str = "Urgence séc
     if not interaction.user.guild_permissions.administrator:
         return await interaction.response.send_message("❌ Commande admin uniquement", ephemeral=True)
     
+    await interaction.response.send_message("🔒 **INITIALISATION DU VERROUILLAGE...**", ephemeral=True)
+    
     try:
-        for channel in interaction.guild.text_channels:
-            await channel.set_permissions(interaction.guild.default_role, send_messages=False)
+        # Créer l'embed cinématique
+        lockdown_embed = discord.Embed(
+            title="🚨 ⚠️ **ALERTE SÉCURITÉ MAXIMALE** ⚠️ 🚨",
+            description=f"```diff\n- SERVEUR EN VERROUILLAGE TOTAL\n- ACCÈS COMMUNICATION SUSPENDU\n- SEULS LES ADMINISTRATEURS AUTORISÉS\n```\n\n**📋 RAISON:** `{reason}`\n**🔐 STATUT:** `VERROUILLÉ`\n**⏰ HEURE:** <t:{int(datetime.now().timestamp())}:F>\n**👤 MODÉRATEUR:** {interaction.user.mention}",
+            color=0xff0000
+        )
+        lockdown_embed.set_image(url="https://media.giphy.com/media/l0HlBO7eyXzSZkJri/giphy.gif")
+        lockdown_embed.set_thumbnail(url="https://media.giphy.com/media/xTiTnHXbRoaZ1B1Mo8/giphy.gif")
+        lockdown_embed.add_field(
+            name="🛡️ **PROTOCOLE DE SÉCURITÉ ACTIVÉ**",
+            value="```yaml\n✅ Communications bloquées\n✅ Permissions révoquées\n✅ Surveillance active\n✅ Mode défensif engagé```",
+            inline=False
+        )
+        lockdown_embed.set_footer(text="🔒 SYSTÈME DE SÉCURITÉ ASTRAL | VERROUILLAGE TOTAL ENGAGÉ", icon_url="https://cdn.discordapp.com/emojis/1234567890123456789.png")
         
-        embed = discord.Embed(title="🔒 SERVEUR VERROUILLÉ", description=f"Raison: {reason}", color=0xff0000)
-        await interaction.response.send_message(embed=embed)
-    except:
-        await interaction.response.send_message("❌ Erreur lors du verrouillage", ephemeral=True)
+        # Verrouiller tous les canaux
+        locked_channels = 0
+        for channel in interaction.guild.text_channels:
+            try:
+                await channel.set_permissions(interaction.guild.default_role, send_messages=False)
+                locked_channels += 1
+            except:
+                pass
+        
+        # Envoyer dans tous les canaux texte
+        for channel in interaction.guild.text_channels:
+            try:
+                await channel.send("🚨" * 10)
+                await channel.send(embed=lockdown_embed)
+                await channel.send("🚨" * 10)
+            except:
+                pass
+        
+        # Confirmer dans le canal de commande
+        await interaction.followup.send(f"✅ **VERROUILLAGE TERMINÉ** - {locked_channels} canaux sécurisés", ephemeral=True)
+        
+    except Exception as e:
+        await interaction.followup.send("❌ Erreur lors du verrouillage", ephemeral=True)
 
 @bot.tree.command(name="unlock", description="Déverrouiller le serveur")
 async def unlock(interaction: discord.Interaction):
     if not interaction.user.guild_permissions.administrator:
         return await interaction.response.send_message("❌ Commande admin uniquement", ephemeral=True)
     
+    await interaction.response.send_message("🔓 **INITIALISATION DU DÉVERROUILLAGE...**", ephemeral=True)
+    
     try:
-        for channel in interaction.guild.text_channels:
-            await channel.set_permissions(interaction.guild.default_role, send_messages=None)
+        # Créer l'embed cinématique
+        unlock_embed = discord.Embed(
+            title="🎉 ✨ **LIBÉRATION TOTALE** ✨ 🎉",
+            description=f"```diff\n+ SERVEUR DÉVERROUILLÉ AVEC SUCCÈS\n+ COMMUNICATIONS RÉTABLIES\n+ ACCÈS TOTAL RESTAURÉ\n```\n\n**🔓 STATUT:** `OPÉRATIONNEL`\n**⏰ HEURE:** <t:{int(datetime.now().timestamp())}:F>\n**👤 MODÉRATEUR:** {interaction.user.mention}\n**💬 MESSAGE:** `Bienvenue de retour ! Le serveur est maintenant pleinement opérationnel.`",
+            color=0x00ff66
+        )
+        unlock_embed.set_image(url="https://media.giphy.com/media/26u4cqiYI30juCOGY/giphy.gif")
+        unlock_embed.set_thumbnail(url="https://media.giphy.com/media/3o7abKhOpu0NwenH3O/giphy.gif")
+        unlock_embed.add_field(
+            name="🎊 **SYSTÈME LIBÉRÉ**",
+            value="```yaml\n✅ Communications rétablies\n✅ Permissions restaurées\n✅ Mode normal activé\n✅ Activité autorisée```",
+            inline=False
+        )
+        unlock_embed.add_field(
+            name="🌟 **STATUT DU SERVEUR**",
+            value="```css\n[OPÉRATIONNEL] Toutes les fonctionnalités disponibles\n[SÉCURISÉ] Protection active maintenue\n[STABLE] Système en fonctionnement optimal```",
+            inline=False
+        )
+        unlock_embed.set_footer(text="🔓 SYSTÈME DE SÉCURITÉ ASTRAL | ACCÈS TOTAL RESTAURÉ", icon_url="https://cdn.discordapp.com/emojis/1234567890123456789.png")
         
-        embed = discord.Embed(title="🔓 SERVEUR DÉVERROUILLÉ", description="Communication rétablie", color=0x00ff00)
-        await interaction.response.send_message(embed=embed)
-    except:
-        await interaction.response.send_message("❌ Erreur lors du déverrouillage", ephemeral=True)
+        # Déverrouiller tous les canaux
+        unlocked_channels = 0
+        for channel in interaction.guild.text_channels:
+            try:
+                await channel.set_permissions(interaction.guild.default_role, send_messages=None)
+                unlocked_channels += 1
+            except:
+                pass
+        
+        # Envoyer dans tous les canaux texte
+        for channel in interaction.guild.text_channels:
+            try:
+                await channel.send("🎉" * 10)
+                await channel.send(embed=unlock_embed)
+                await channel.send("🎊" * 10)
+            except:
+                pass
+        
+        # Confirmer dans le canal de commande
+        await interaction.followup.send(f"✅ **DÉVERROUILLAGE TERMINÉ** - {unlocked_channels} canaux libérés", ephemeral=True)
+        
+    except Exception as e:
+        await interaction.followup.send("❌ Erreur lors du déverrouillage", ephemeral=True)
 
 @bot.tree.command(name="nuke", description="Supprimer tous les messages du canal")
 async def nuke(interaction: discord.Interaction):
@@ -223,7 +294,22 @@ async def nuke(interaction: discord.Interaction):
     channel_position = interaction.channel.position
     channel_category = interaction.channel.category
     
-    await interaction.response.send_message("💥 Nuke en cours...", ephemeral=True)
+    # Message de préparation
+    await interaction.response.send_message("💥 **PRÉPARATION DE LA DÉTONATION NUCLÉAIRE...**", ephemeral=True)
+    
+    # Countdown dramatique
+    countdown_embed = discord.Embed(
+        title="💣 ⚠️ **ALERTE DÉTONATION IMMINENTE** ⚠️ 💣",
+        description="```diff\n- PRÉPARATION DE LA DESTRUCTION TOTALE\n- ÉVACUATION NUMÉRIQUE EN COURS\n- NETTOYAGE RADICAL IMMINENT\n```",
+        color=0xff4500
+    )
+    countdown_embed.set_image(url="https://media.giphy.com/media/oe33xf3B50fsc/giphy.gif")
+    countdown_embed.add_field(name="⚡ COMPTE À REBOURS", value="```css\n[3] INITIALISATION...\n[2] CHARGEMENT...\n[1] DÉTONATION...\n[0] BOOM! 💥```", inline=False)
+    
+    countdown_msg = await interaction.channel.send(embed=countdown_embed)
+    
+    # Attendre un peu pour l'effet dramatique
+    await asyncio.sleep(3)
     
     try:
         await interaction.channel.delete()
@@ -232,9 +318,33 @@ async def nuke(interaction: discord.Interaction):
             position=channel_position,
             category=channel_category
         )
-        embed = discord.Embed(title="💥 CANAL NUKÉE", description="Tous les messages supprimés", color=0xff6b6b)
-        await new_channel.send(embed=embed)
-    except:
+        
+        # Message post-nuke cinématique
+        nuke_embed = discord.Embed(
+            title="🌋 💥 **DÉTONATION RÉUSSIE** 💥 🌋",
+            description=f"```diff\n+ CANAL COMPLÈTEMENT PURIFIÉ\n+ DESTRUCTION TOTALE ACCOMPLIE\n+ RENAISSANCE NUMÉRIQUE INITIÉE\n```\n\n**💣 OPÉRATION:** `NUKE COMPLÈTE`\n**🔥 CANAL:** `#{channel_name}`\n**⏰ HEURE:** <t:{int(datetime.now().timestamp())}:F>\n**👤 OPÉRATEUR:** {interaction.user.mention}",
+            color=0xff0000
+        )
+        nuke_embed.set_image(url="https://media.giphy.com/media/3oriO0OEd9QIDdllqo/giphy.gif")
+        nuke_embed.set_thumbnail(url="https://media.giphy.com/media/l46CyJmS9KUbokzsI/giphy.gif")
+        nuke_embed.add_field(
+            name="☢️ **RAPPORT DE DÉTONATION**",
+            value="```yaml\n✅ Messages éliminés: TOUS\n✅ Historique effacé: COMPLET\n✅ Canal purifié: 100%\n✅ Reconstruction: TERMINÉE```",
+            inline=False
+        )
+        nuke_embed.add_field(
+            name="🔄 **STATUT POST-APOCALYPSE**",
+            value="```css\n[NOUVEAU] Canal fraîchement recréé\n[PROPRE] Aucun message résiduel\n[PRÊT] Disponible pour utilisation```",
+            inline=False
+        )
+        nuke_embed.set_footer(text="💥 SYSTÈME DE PURIFICATION ASTRAL | NUKE RÉUSSI", icon_url="https://cdn.discordapp.com/emojis/1234567890123456789.png")
+        
+        await new_channel.send("💥" * 15)
+        await new_channel.send(embed=nuke_embed)
+        await new_channel.send("☢️" * 15)
+        await new_channel.send("**🎉 BIENVENUE DANS LE NOUVEAU CANAL PURIFIÉ ! 🎉**")
+        
+    except Exception as e:
         pass
 
 @bot.tree.command(name="massban", description="Bannir plusieurs utilisateurs")
