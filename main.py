@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 import json
 import asyncio
 import logging
+from dotenv import load_dotenv
 
 #toujours en vie 
 from flask import Flask
