@@ -5,6 +5,7 @@ from discord import app_commands
 from datetime import datetime, timedelta
 import json
 import asyncio
+import logging
 
 #toujours en vie 
 from flask import Flask
