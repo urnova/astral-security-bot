@@ -6,14 +6,6 @@ from datetime import datetime, timedelta
 import json
 import asyncio
 import logging
-from dotenv import load_dotenv
-import os
-import discord
-from discord.ext import commands
-from discord import app_commands
-from datetime import datetime, timedelta
-import json
-import asyncio
 
 #toujours en vie 
 from flask import Flask
