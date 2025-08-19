@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 import json
 import asyncio
 import logging
-
+from dotenv import load_dotenv
 
 # --- DÉBUT : Code NÉCESSAIRE pour la gestion des données par serveur ---
 DATA_FILE = "data.json"
