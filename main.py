@@ -795,9 +795,33 @@ async def on_member_remove(member):
 
 # DÉMARRAGE
 if __name__ == "__main__":
-    token = os.getenv("TOKEN")
+    # Initialisation du système de logs
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
+    
+    # Chargement des variables d'environnement
+    load_dotenv()
+    token = os.getenv("DISCORD_BOT_TOKEN")
+    
     if not token:
-        print("❌ Token manquant dans les Secrets!")
-    else:
-        keep_alive()
+        logging.critical("❌ Token manquant! Définissez la variable DISCORD_BOT_TOKEN dans .env")
+        sys.exit(1)  # Quitte avec code d'erreur
+    
+    # Configuration des dossiers
+    os.makedirs('configs', exist_ok=True)
+    
+    # Gestion des erreurs spécifiques
+    try:
+        logging.info("🚀 Démarrage du bot...")
         bot.run(token)
+    except discord.errors.LoginFailure:
+        logging.critical("🔑 Token invalide! Vérifiez votre token Discord")
+        sys.exit(1)
+    except KeyboardInterrupt:
+        logging.info("🛑 Arrêt manuel du bot")
+        sys.exit(0)
+    except Exception as e:
+        logging.error(f"💥 Erreur inattendue: {str(e)}")
+        sys.exit(1)
