@@ -36,7 +36,10 @@ def load_data():
     global GUILD_DATA
     if os.path.exists(DATA_FILE):
         with open(DATA_FILE, 'r') as f:
-            GUILD_DATA = json.load(f)
+            try:
+                GUILD_DATA = json.load(f)
+            except json.JSONDecodeError:
+                GUILD_DATA = {}
     else:
         GUILD_DATA = {}
 
@@ -73,10 +76,10 @@ bot = commands.Bot(command_prefix='!', intents=intents)
 # Groupe de commandes 'admin'
 admin_group = app_commands.Group(
     name="admin",
-    description="Commandes réservées aux administrateurs",
+    description="Commandes réservées aux administrateateurs",
     default_permissions=discord.Permissions(administrator=True)
 )
-bot.tree.add_command(admin_group)
+# LA LIGNE `bot.tree.add_command(admin_group)` A ÉTÉ DÉPLACÉE D'ICI
 
 
 # Variables globales (pour les données non persistantes)
@@ -227,7 +230,6 @@ async def unwarn(interaction: discord.Interaction, member: discord.Member, warn_
 @admin_group.command(name="lockdown", description="Verrouiller le serveur")
 async def lockdown(interaction: discord.Interaction, reason: str = "Urgence sécuritaire"):
     await interaction.response.send_message("🔒 **INITIALISATION DU VERROUILLAGE...**", ephemeral=True)
-    # Le reste de la fonction est purement visuel et basé sur les permissions, pas besoin de data.json
     try:
         lockdown_embed = discord.Embed(
             title="🚨 ⚠️ **ALERTE SÉCURITÉ MAXIMALE** ⚠️ 🚨",
@@ -296,33 +298,23 @@ async def unlock(interaction: discord.Interaction):
 
 @admin_group.command(name="nuke", description="Supprimer tous les messages du canal")
 async def nuke(interaction: discord.Interaction):
-    channel_name = interaction.channel.name
-    channel_position = interaction.channel.position
-    channel_category = interaction.channel.category
-
-    await interaction.response.send_message("💥 **PRÉPARATION DE LA DÉTONATION NUCLÉAIRE...**", ephemeral=True)
-
-    countdown_embed = discord.Embed(title="💣 ⚠️ **ALERTE DÉTONATION IMMINENTE** ⚠️ 💣", description="```diff\n- PRÉPARATION DE LA DESTRUCTION TOTALE\n- ÉVACUATION NUMÉRIQUE EN COURS\n- NETTOYAGE RADICAL IMMINENT\n```", color=0xff4500)
-    countdown_embed.set_image(url="https://media.giphy.com/media/oe33xf3B50fsc/giphy.gif")
-    countdown_embed.add_field(name="⚡ COMPTE À REBOURS", value="```css\n[3] INITIALISATION...\n[2] CHARGEMENT...\n[1] DÉTONATION...\n[0] BOOM! 💥```", inline=False)
-    await interaction.channel.send(embed=countdown_embed)
-    await asyncio.sleep(3)
-
+    channel = interaction.channel
     try:
-        await interaction.channel.delete()
-        new_channel = await interaction.guild.create_text_channel(name=channel_name, position=channel_position, category=channel_category)
+        await interaction.response.defer(ephemeral=True)
         
-        nuke_embed = discord.Embed(title="🌋 💥 **DÉTONATION RÉUSSIE** 💥 🌋", description=f"```diff\n+ CANAL COMPLÈTEMENT PURIFIÉ\n+ DESTRUCTION TOTALE ACCOMPLIE\n+ RENAISSANCE NUMÉRIQUE INITIÉE\n```\n\n**💣 OPÉRATION:** `NUKE COMPLÈTE`\n**🔥 CANAL:** `#{channel_name}`\n**⏰ HEURE:** <t:{int(datetime.now().timestamp())}:F>\n**👤 OPÉRATEUR:** {interaction.user.mention}", color=0xff0000)
+        countdown_embed = discord.Embed(title="💣 ⚠️ **ALERTE DÉTONATION IMMINENTE** ⚠️ 💣", description="Ce canal sera recréé dans 5 secondes...", color=0xff4500)
+        countdown_embed.set_image(url="https://media.giphy.com/media/oe33xf3B50fsc/giphy.gif")
+        await channel.send(embed=countdown_embed)
+        await asyncio.sleep(5)
+        
+        new_channel = await channel.clone(reason="Nuke command")
+        await channel.delete()
+
+        nuke_embed = discord.Embed(title="🌋 💥 **DÉTONATION RÉUSSIE** 💥 🌋", description=f"Ce canal a été purifié par {interaction.user.mention}", color=0xff0000)
         nuke_embed.set_image(url="https://media.giphy.com/media/3oriO0OEd9QIDdllqo/giphy.gif")
-        nuke_embed.set_thumbnail(url="https://media.giphy.com/media/l46CyJmS9KUbokzsI/giphy.gif")
-        nuke_embed.add_field(name="☢️ **RAPPORT DE DÉTONATION**", value="```yaml\n✅ Messages éliminés: TOUS\n✅ Historique effacé: COMPLET\n✅ Canal purifié: 100%\n✅ Reconstruction: TERMINÉE```", inline=False)
-        nuke_embed.add_field(name="🔄 **STATUT POST-APOCALYPSE**", value="```css\n[NOUVEAU] Canal fraîchement recréé\n[PROPRE] Aucun message résiduel\n[PRÊT] Disponible pour utilisation```", inline=False)
-        nuke_embed.set_footer(text="💥 SYSTÈME DE PURIFICATION ASTRAL | NUKE RÉUSSI")
-        
-        await new_channel.send("💥" * 15, embed=nuke_embed)
-        await new_channel.send("**🎉 BIENVENUE DANS LE NOUVEAU CANAL PURIFIÉ ! 🎉**")
-    except:
-        pass
+        await new_channel.send(embed=nuke_embed)
+    except Exception as e:
+        await interaction.followup.send(f"❌ Erreur lors du nuke: {e}", ephemeral=True)
 
 @admin_group.command(name="massban", description="Bannir plusieurs utilisateurs")
 async def massban(interaction: discord.Interaction, user_ids: str, reason: str = "Ban de masse"):
@@ -410,17 +402,12 @@ async def maintenance_on(interaction: discord.Interaction, reason: str = "Mainte
 
     await interaction.response.send_message("🔧 **INITIALISATION DU MODE MAINTENANCE...**", ephemeral=True)
     try:
-        maintenance_embed = discord.Embed(title="🚧 ⚠️ **MAINTENANCE EN COURS** ⚠️ 🚧", description=f"```diff\n- SERVEUR EN MAINTENANCE TECHNIQUE\n- ACCÈS UTILISATEUR SUSPENDU\n- INTERVENTIONS ADMINISTRATIVES EN COURS\n```\n\n**🔧 RAISON:** `{reason}`\n**⚙️ STATUT:** `MAINTENANCE ACTIVE`\n**⏰ DÉBUT:** <t:{int(datetime.now().timestamp())}:F>\n**👨‍💻 TECHNICIEN:** {interaction.user.mention}", color=0xffa500)
+        maintenance_embed = discord.Embed(title="🚧 ⚠️ **MAINTENANCE EN COURS** ⚠️ 🚧", description=f"```diff\n- SERVEUR EN MAINTENANCE TECHNIQUE\n- ACCÈS UTILISATEUR SUSPENDU\n```\n\n**🔧 RAISON:** `{reason}`", color=0xffa500)
         maintenance_embed.set_image(url="https://media.giphy.com/media/3oKIPnAiaMCws8nOsE/giphy.gif")
-        maintenance_embed.set_thumbnail(url="https://media.giphy.com/media/xTiTnHXbRoaZ1B1Mo8/giphy.gif")
-        maintenance_embed.add_field(name="⚙️ **OPÉRATIONS EN COURS**", value="```yaml\n🔧 Maintenance système active\n🛠️ Interventions techniques\n🔄 Optimisations serveur\n⏸️ Communications suspendues```", inline=False)
-        maintenance_embed.add_field(name="🚫 **RESTRICTIONS ACTIVES**", value="```css\n[BLOQUÉ] Messages utilisateurs\n[AUTORISÉ] Communications admin\n[ACTIF] Surveillance système\n[STANDBY] Fonctions normales```", inline=False)
-        maintenance_embed.add_field(name="📋 **INFORMATIONS**", value=f"```fix\nDurée estimée: En cours d'évaluation\nImpact: Communications temporairement suspendues\nContact: Équipe administrative disponible```", inline=False)
-        maintenance_embed.set_footer(text="🔧 SYSTÈME DE MAINTENANCE ASTRAL | MODE TECHNIQUE ACTIVÉ")
-        
+
         for channel in interaction.guild.text_channels:
             try:
-                await channel.send("🚧" * 10, embed=maintenance_embed)
+                await channel.send(embed=maintenance_embed)
             except:
                 pass
         
@@ -436,18 +423,12 @@ async def maintenance_off(interaction: discord.Interaction):
 
     await interaction.response.send_message("✅ **FINALISATION DE LA MAINTENANCE...**", ephemeral=True)
     try:
-        end_maintenance_embed = discord.Embed(title="🎉 ✨ **MAINTENANCE TERMINÉE** ✨ 🎉", description=f"```diff\n+ MAINTENANCE TECHNIQUE COMPLÉTÉE\n+ SERVEUR PLEINEMENT OPÉRATIONNEL\n+ COMMUNICATIONS RÉTABLIES\n```\n\n**✅ STATUT:** `OPÉRATIONNEL`\n**⏰ FIN:** <t:{int(datetime.now().timestamp())}:F>\n**👨‍💻 TECHNICIEN:** {interaction.user.mention}\n**🔄 RÉSULTAT:** `Maintenance réussie - Système optimisé`", color=0x00ff66)
+        end_maintenance_embed = discord.Embed(title="🎉 ✨ **MAINTENANCE TERMINÉE** ✨ 🎉", description="```diff\n+ SERVEUR PLEINEMENT OPÉRATIONNEL\n+ COMMUNICATIONS RÉTABLIES\n```", color=0x00ff66)
         end_maintenance_embed.set_image(url="https://media.giphy.com/media/26u4cqiYI30juCOGY/giphy.gif")
-        end_maintenance_embed.set_thumbnail(url="https://media.giphy.com/media/3o7abKhOpu0NwenH3O/giphy.gif")
-        end_maintenance_embed.add_field(name="🎊 **MAINTENANCE RÉUSSIE**", value="```yaml\n✅ Système entièrement opérationnel\n✅ Communications restaurées\n✅ Optimisations appliquées\n✅ Serveur stabilisé```", inline=False)
-        end_maintenance_embed.add_field(name="🌟 **AMÉLIORATIONS APPORTÉES**", value="```css\n[OPTIMISÉ] Performances système\n[SÉCURISÉ] Protocoles de sécurité\n[STABLE] Fonctionnement optimal\n[DISPONIBLE] Toutes fonctionnalités```", inline=False)
-        end_maintenance_embed.add_field(name="📢 **ANNONCE**", value="```fix\nLe serveur est maintenant pleinement fonctionnel !\nMerci de votre patience pendant la maintenance.\nToutes les fonctionnalités sont disponibles.```", inline=False)
-        end_maintenance_embed.set_footer(text="✅ SYSTÈME DE MAINTENANCE ASTRAL | SERVEUR OPÉRATIONNEL")
         
         for channel in interaction.guild.text_channels:
             try:
-                await channel.send("🎉" * 10, embed=end_maintenance_embed)
-                await channel.send("**🚀 LE SERVEUR EST DE RETOUR ! BIENVENUE ! 🚀**")
+                await channel.send(embed=end_maintenance_embed)
             except:
                 pass
         
@@ -461,110 +442,87 @@ async def setlogchannel(interaction: discord.Interaction, channel: discord.TextC
     guild_data["LOG_CHANNEL_ID"] = channel.id
     save_data()
 
-    embed = discord.Embed(title="📝 Canal de logs défini", description=f"Logs dans {channel.mention}", color=0x0099ff)
+    embed = discord.Embed(title="📝 Canal de logs défini", description=f"Les logs seront désormais envoyés dans {channel.mention}", color=0x0099ff)
     await interaction.response.send_message(embed=embed)
 
-async def log_action(interaction: discord.Interaction, embed: discord.Embed):
-    """Helper function to send logs if the channel is configured."""
-    guild_data = get_guild_data(interaction.guild.id)
+async def log_action(guild: discord.Guild, embed: discord.Embed):
+    """Fonction pour envoyer un log dans le canal configuré."""
+    guild_data = get_guild_data(guild.id)
     log_channel_id = guild_data.get("LOG_CHANNEL_ID")
     if log_channel_id:
         log_channel = bot.get_channel(log_channel_id)
-        if log_channel and log_channel.id != interaction.channel.id:
+        if log_channel:
             try:
                 await log_channel.send(embed=embed)
             except discord.Forbidden:
-                print(f"Missing permissions to send logs in channel {log_channel_id}")
-            except Exception as e:
-                print(f"Error sending log: {e}")
+                print(f"Permissions manquantes pour envoyer des logs dans le canal {log_channel_id} du serveur {guild.name}")
 
 @admin_group.command(name="say", description="Faire parler le bot")
 async def say(interaction: discord.Interaction, message: str, channel: discord.TextChannel = None):
     target_channel = channel or interaction.channel
     try:
         await target_channel.send(message)
-        embed = discord.Embed(title="✅ Message envoyé", description=f"Message envoyé dans {target_channel.mention}", color=0x00ff00)
-        embed.add_field(name="Contenu", value=f"```{message[:1000]}```", inline=False)
-        embed.add_field(name="Expéditeur", value=interaction.user.mention, inline=True)
-        embed.add_field(name="Canal", value=target_channel.mention, inline=True)
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        await interaction.response.send_message(f"✅ Message envoyé dans {target_channel.mention}", ephemeral=True)
 
-        log_embed = discord.Embed(title="📤 Message bot envoyé", description=f"Message envoyé via le bot dans {target_channel.mention}", color=0x0099ff)
-        log_embed.add_field(name="Contenu", value=f"```{message[:1000]}```", inline=False)
-        log_embed.add_field(name="Administrateur", value=interaction.user.mention, inline=True)
-        log_embed.add_field(name="Heure", value=f"<t:{int(datetime.now().timestamp())}:F>", inline=True)
-        await log_action(interaction, log_embed)
+        log_embed = discord.Embed(title="📤 Message envoyé par un admin", color=0x0099ff, timestamp=datetime.now())
+        log_embed.add_field(name="Contenu", value=message, inline=False)
+        log_embed.add_field(name="Administrateur", value=interaction.user.mention)
+        log_embed.add_field(name="Canal", value=target_channel.mention)
+        await log_action(interaction.guild, log_embed)
     except Exception as e:
-        await interaction.response.send_message(f"❌ Erreur lors de l'envoi: {str(e)}", ephemeral=True)
+        await interaction.response.send_message(f"❌ Erreur: {e}", ephemeral=True)
 
 @admin_group.command(name="embed", description="Envoyer un message embed via le bot")
 async def send_embed(interaction: discord.Interaction, title: str, description: str, channel: discord.TextChannel = None, color: str = "0x0099ff"):
     target_channel = channel or interaction.channel
     try:
         embed_color = int(color.replace("#", ""), 16)
-    except:
-        embed_color = 0x0099ff
+    except ValueError:
+        return await interaction.response.send_message("❌ Format de couleur invalide. Utilisez le format hexadécimal (ex: `0099ff`).", ephemeral=True)
 
     embed = discord.Embed(title=title, description=description, color=embed_color, timestamp=datetime.now())
-    embed.set_footer(text=f"Message officiel • {interaction.guild.name}")
+    embed.set_footer(text=f"Message de {interaction.guild.name}")
     await target_channel.send(embed=embed)
     
-    confirm_embed = discord.Embed(title="✅ Embed envoyé", description=f"Embed envoyé dans {target_channel.mention}", color=0x00ff00)
-    confirm_embed.add_field(name="Titre", value=title, inline=False)
-    confirm_embed.add_field(name="Description", value=description[:1000], inline=False)
-    confirm_embed.add_field(name="Expéditeur", value=interaction.user.mention, inline=True)
-    await interaction.response.send_message(embed=confirm_embed, ephemeral=True)
+    await interaction.response.send_message(f"✅ Embed envoyé dans {target_channel.mention}", ephemeral=True)
 
-    log_embed = discord.Embed(title="📤 Embed bot envoyé", description=f"Embed envoyé dans {target_channel.mention}", color=0x0099ff)
+    log_embed = discord.Embed(title="📤 Embed envoyé par un admin", color=0x0099ff, timestamp=datetime.now())
     log_embed.add_field(name="Titre", value=title, inline=False)
-    log_embed.add_field(name="Description", value=description[:1000], inline=False)
-    log_embed.add_field(name="Administrateur", value=interaction.user.mention, inline=True)
-    await log_action(interaction, log_embed)
+    log_embed.add_field(name="Administrateur", value=interaction.user.mention)
+    await log_action(interaction.guild, log_embed)
 
 @admin_group.command(name="announce", description="Envoyer une annonce officielle")
 async def announce(interaction: discord.Interaction, title: str, message: str, channel: discord.TextChannel = None, ping_everyone: bool = False):
     target_channel = channel or interaction.channel
     try:
         announce_embed = discord.Embed(title=f"📢 {title}", description=message, color=0xffd700, timestamp=datetime.now())
-        announce_embed.set_footer(text=f"Annonce officielle • {interaction.guild.name}")
-        announce_embed.set_author(name="ANNONCE OFFICIELLE", icon_url=interaction.guild.icon.url if interaction.guild.icon else None)
-        announce_embed.set_thumbnail(url="https://media.giphy.com/media/l0HlQoLBxzlnKRT8s/giphy.gif")
+        announce_embed.set_footer(text=f"Annonce de {interaction.guild.name}")
+        if interaction.guild.icon:
+            announce_embed.set_author(name="ANNONCE OFFICIELLE", icon_url=interaction.guild.icon.url)
         
         content = "@everyone" if ping_everyone else ""
-        await target_channel.send("🔔" * 5)
         await target_channel.send(content=content, embed=announce_embed)
-        await target_channel.send("🔔" * 5)
 
-        confirm_embed = discord.Embed(title="✅ Annonce publiée", description=f"Annonce envoyée dans {target_channel.mention}", color=0x00ff00)
-        await interaction.response.send_message(embed=confirm_embed, ephemeral=True)
-
-        log_embed = discord.Embed(title="📢 Annonce officielle publiée", description=f"Annonce publiée dans {target_channel.mention}", color=0xffd700)
-        log_embed.add_field(name="Titre", value=title, inline=False)
-        log_embed.add_field(name="Message", value=message[:1000], inline=False)
-        log_embed.add_field(name="Administrateur", value=interaction.user.mention, inline=True)
-        log_embed.add_field(name="Ping", value="Oui" if ping_everyone else "Non", inline=True)
-        await log_action(interaction, log_embed)
+        await interaction.response.send_message(f"✅ Annonce envoyée dans {target_channel.mention}", ephemeral=True)
     except Exception as e:
         await interaction.response.send_message(f"❌ Erreur: {e}", ephemeral=True)
 
 @admin_group.command(name="dm", description="Envoyer un MP à un utilisateur via le bot")
 async def send_dm(interaction: discord.Interaction, member: discord.Member, message: str):
     try:
-        dm_embed = discord.Embed(title="📨 Message du serveur", description=message, color=0x0099ff, timestamp=datetime.now())
-        dm_embed.set_footer(text=f"Message officiel de {interaction.guild.name}")
-        dm_embed.set_author(name=interaction.guild.name, icon_url=interaction.guild.icon.url if interaction.guild.icon else None)
+        dm_embed = discord.Embed(title=f"📨 Message de {interaction.guild.name}", description=message, color=0x0099ff, timestamp=datetime.now())
+        if interaction.guild.icon:
+            dm_embed.set_author(name=interaction.guild.name, icon_url=interaction.guild.icon.url)
         await member.send(embed=dm_embed)
 
-        confirm_embed = discord.Embed(title="✅ MP envoyé", description=f"Message privé envoyé à {member.mention}", color=0x00ff00)
-        await interaction.response.send_message(embed=confirm_embed, ephemeral=True)
+        await interaction.response.send_message(f"✅ MP envoyé à {member.mention}", ephemeral=True)
 
-        log_embed = discord.Embed(title="📨 MP bot envoyé", description=f"MP envoyé à {member.mention}", color=0x0099ff)
-        log_embed.add_field(name="Contenu", value=f"```{message[:1000]}```", inline=False)
-        log_embed.add_field(name="Destinataire", value=member.mention, inline=True)
-        log_embed.add_field(name="Administrateur", value=interaction.user.mention, inline=True)
-        await log_action(interaction, log_embed)
+        log_embed = discord.Embed(title="📨 MP envoyé par un admin", color=0x0099ff, timestamp=datetime.now())
+        log_embed.add_field(name="Destinataire", value=member.mention)
+        log_embed.add_field(name="Administrateur", value=interaction.user.mention)
+        await log_action(interaction.guild, log_embed)
     except discord.Forbidden:
-        await interaction.response.send_message(f"❌ Impossible d'envoyer un MP à {member.mention} (MP fermés)", ephemeral=True)
+        await interaction.response.send_message(f"❌ Impossible d'envoyer un MP à {member.mention} (ses MPs sont probablement fermés).", ephemeral=True)
     except Exception as e:
         await interaction.response.send_message(f"❌ Erreur: {e}", ephemeral=True)
 
@@ -572,7 +530,7 @@ async def send_dm(interaction: discord.Interaction, member: discord.Member, mess
 @bot.tree.command(name="serverinfo", description="Informations du serveur")
 async def serverinfo(interaction: discord.Interaction):
     guild = interaction.guild
-    embed = discord.Embed(title=f"📊 {guild.name}", color=0x0099ff)
+    embed = discord.Embed(title=f"📊 Informations sur {guild.name}", color=0x0099ff)
     embed.add_field(name="Membres", value=guild.member_count)
     embed.add_field(name="Canaux", value=len(guild.channels))
     embed.add_field(name="Rôles", value=len(guild.roles))
@@ -585,20 +543,33 @@ async def serverinfo(interaction: discord.Interaction):
 @bot.tree.command(name="userinfo", description="Informations d'un utilisateur")
 async def userinfo(interaction: discord.Interaction, member: discord.Member = None):
     member = member or interaction.user
-    embed = discord.Embed(title=f"👤 {member.display_name}", color=member.color)
+    embed = discord.Embed(title=f"👤 Informations sur {member.display_name}", color=member.color)
     embed.add_field(name="ID", value=member.id)
-    embed.add_field(name="Rejoint le", value=member.joined_at.strftime("%d/%m/%Y"))
-    embed.add_field(name="Compte créé", value=member.created_at.strftime("%d/%m/%Y"))
-    embed.add_field(name="Rôles", value=len(member.roles) - 1)
+    embed.add_field(name="A rejoint le serveur le", value=member.joined_at.strftime("%d/%m/%Y"))
+    embed.add_field(name="Compte créé le", value=member.created_at.strftime("%d/%m/%Y"))
+    embed.add_field(name="Nombre de rôles", value=len(member.roles) - 1)
     if member.avatar:
         embed.set_thumbnail(url=member.avatar.url)
     await interaction.response.send_message(embed=embed)
     
 @bot.tree.command(name="commands", description="Liste détaillée des commandes")
 async def commands_list(interaction: discord.Interaction):
-    # Cette commande n'a pas besoin de modification car elle affiche simplement de l'aide
-    # ... (le code de la commande reste identique)
-    await interaction.response.send_message("Le code de cette commande est long et reste inchangé.", ephemeral=True)
+    embed = discord.Embed(title="📜 Liste des commandes", color=0x0099ff)
+    if interaction.user.guild_permissions.administrator:
+        embed.add_field(name="🔨 Modération", value="`/admin kick`, `/admin ban`, `/admin unban`, `/admin mute`, `/admin unmute`, `/admin clear`", inline=False)
+        embed.add_field(name="⚠️ Avertissements", value="`/admin warn`, `/admin warns`, `/admin unwarn`", inline=False)
+        embed.add_field(name="🛡️ Sécurité", value="`/admin lockdown`, `/admin unlock`, `/admin nuke`, `/admin massban`", inline=False)
+        embed.add_field(name="🤖 Automodération", value="`/admin antiraid`, `/admin automod`, `/admin addword`, `/admin removeword`, `/admin bannedwords`", inline=False)
+        embed.add_field(name="📤 Communication", value="`/admin say`, `/admin embed`, `/admin announce`, `/admin dm`", inline=False)
+        embed.add_field(name="⚙️ Système", value="`/admin maintenance`, `/admin maintenance_off`, `/admin setlogchannel`", inline=False)
+    
+    embed.add_field(name="🌐 Commandes Générales", value="`/commands`, `/serverinfo`, `/userinfo`", inline=False)
+    await interaction.response.send_message(embed=embed, ephemeral=True)
+
+
+# --- CORRECTION APPLIQUÉE ICI ---
+# On ajoute le groupe de commandes au bot APRÈS avoir défini toutes les commandes du groupe.
+bot.tree.add_command(admin_group)
 
 
 # ÉVÉNEMENTS DE SÉCURITÉ
@@ -612,7 +583,7 @@ async def on_message(message):
     if guild_data["MAINTENANCE_MODE"] and not message.author.guild_permissions.administrator:
         try:
             await message.delete()
-            await message.author.send(f"🔧 Serveur en maintenance: {guild_data['MAINTENANCE_REASON']}")
+            await message.author.send(f"🔧 Le serveur est actuellement en maintenance pour la raison suivante : {guild_data['MAINTENANCE_REASON']}")
         except: pass
         return
 
@@ -621,7 +592,7 @@ async def on_message(message):
         for word in guild_data["BANNED_WORDS"]:
             if word in content_lower:
                 await message.delete()
-                try: await message.author.send("⚠️ Message supprimé: mot interdit détecté")
+                try: await message.author.send("⚠️ Votre message a été supprimé car il contenait un mot interdit.")
                 except: pass
                 return
 
@@ -638,7 +609,7 @@ async def on_message(message):
         if len(ANTI_SPAM[guild_id][user_id]) > MAX_MESSAGES_PER_MINUTE:
             try:
                 await message.author.timeout(discord.utils.utcnow() + timedelta(minutes=5), reason="Spam détecté")
-                await message.channel.send(f"🔇 {message.author.mention} timeout pour spam (5min)")
+                await message.channel.send(f"🔇 {message.author.mention} a été rendu muet pendant 5 minutes pour spam.")
             except: pass
 
         if len(message.mentions) > MAX_MENTIONS:
@@ -654,31 +625,45 @@ async def on_member_join(member):
         if account_age.days < 7:
             try:
                 await member.ban(reason="Protection anti-raid: compte trop récent")
-                log_channel_id = guild_data.get("LOG_CHANNEL_ID")
-                if log_channel_id:
-                    channel = bot.get_channel(log_channel_id)
-                    if channel:
-                        embed = discord.Embed(title="🛡️ Anti-raid", description=f"{member.mention} banni (compte récent)", color=0xff0000)
-                        await channel.send(embed=embed)
+                log_embed = discord.Embed(title="🛡️ Anti-raid activé", description=f"{member.mention} a été banni car son compte a moins de 7 jours.", color=0xff0000)
+                await log_action(member.guild, log_embed)
             except: pass
 
 @bot.event
 async def on_member_remove(member):
-    guild_data = get_guild_data(member.guild.id)
-    log_channel_id = guild_data.get("LOG_CHANNEL_ID")
-    if log_channel_id:
-        channel = bot.get_channel(log_channel_id)
-        if channel:
-            embed = discord.Embed(title="👋 Membre parti", description=f"{member.name} a quitté", color=0xffa500)
-            await channel.send(embed=embed)
+    log_embed = discord.Embed(title="👋 Un membre est parti", description=f"**{member.name}** a quitté le serveur.", color=0xffa500, timestamp=datetime.now())
+    await log_action(member.guild, log_embed)
 
 
 # DÉMARRAGE
 if __name__ == "__main__":
+    # Initialisation du système de logs
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
+    
+    # Chargement des variables d'environnement
     load_dotenv()
-    token = os.getenv("TOKEN_BOT_DISCORD")
+    token = os.getenv("DISCORD_BOT_TOKEN")
+    
     if not token:
-        print("❌ Token manquant dans les variables d'environnement (.env)!")
-    else:
-        keep_alive() # À commenter si vous n'utilisez pas de service d'hébergement web
+        logging.critical("❌ Token manquant! Définissez la variable DISCORD_BOT_TOKEN dans .env")
+        sys.exit(1)  # Quitte avec code d'erreur
+    
+    # Configuration des dossiers
+    os.makedirs('configs', exist_ok=True)
+    
+    # Gestion des erreurs spécifiques
+    try:
+        logging.info("🚀 Démarrage du bot...")
         bot.run(token)
+    except discord.errors.LoginFailure:
+        logging.critical("🔑 Token invalide! Vérifiez votre token Discord")
+        sys.exit(1)
+    except KeyboardInterrupt:
+        logging.info("🛑 Arrêt manuel du bot")
+        sys.exit(0)
+    except Exception as e:
+        logging.error(f"💥 Erreur inattendue: {str(e)}")
+        sys.exit(1)
