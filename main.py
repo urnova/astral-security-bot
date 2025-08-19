@@ -7,22 +7,6 @@ import json
 import asyncio
 import logging
 
-#toujours en vie 
-from flask import Flask
-from threading import Thread
-
-app = Flask('')
-
-@app.route('/')
-def home():
-    return "Je suis vivant !"
-
-def run():
-    app.run(host='0.0.0.0',port=8080)
-
-def keep_alive():
-    t = Thread(target=run)
-    t.start()
 
 # --- DÉBUT : Code NÉCESSAIRE pour la gestion des données par serveur ---
 DATA_FILE = "data.json"
