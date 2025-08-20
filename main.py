@@ -1,3 +1,4 @@
+
 import os
 import discord
 from discord.ext import commands
@@ -82,115 +83,14 @@ def update_server_data(guild_id, key, value):
     data[key] = value
     save_server_data(guild_id, data)
 
-async def log_action(guild, action_type, user, target=None, reason=None, details=None):
-    """Système de logs avancé pour toutes les actions de sécurité"""
-    guild_id = guild.id
-    data = get_server_data(guild_id)
-    log_channel_id = data.get("log_channel_id")
-    
-    if not log_channel_id:
-        return
-    
-    log_channel = bot.get_channel(log_channel_id)
-    if not log_channel:
-        return
-    
-    # Couleurs selon le type d'action
-    colors = {
-        "kick": 0xff6b6b,
-        "ban": 0xff0000,
-        "unban": 0x00ff00,
-        "warn": 0xffff00,
-        "unwarn": 0x00ff00,
-        "timeout": 0xffa500,
-        "lockdown": 0xff0000,
-        "unlock": 0x00ff00,
-        "maintenance": 0xffa500,
-        "nuke": 0xff4500,
-        "automod": 0x9932cc,
-        "antiraid": 0x0099ff,
-        "message_delete": 0xff6b6b,
-        "spam_detected": 0xff0000,
-        "member_join": 0x00ff00,
-        "member_leave": 0xffa500,
-        "security": 0xff0000
-    }
-    
-    # Émojis selon le type
-    emojis = {
-        "kick": "👢",
-        "ban": "🔨",
-        "unban": "✅",
-        "warn": "⚠️",
-        "unwarn": "✅",
-        "timeout": "🔇",
-        "lockdown": "🚨",
-        "unlock": "🎉",
-        "maintenance": "🚧",
-        "nuke": "💥",
-        "automod": "🤖",
-        "antiraid": "🛡️",
-        "message_delete": "🗑️",
-        "spam_detected": "🚫",
-        "member_join": "👋",
-        "member_leave": "👋",
-        "security": "🔒"
-    }
-    
-    embed = discord.Embed(
-        title=f"{emojis.get(action_type, '📝')} LOG DE SÉCURITÉ",
-        color=colors.get(action_type, 0x0099ff),
-        timestamp=datetime.now()
-    )
-    
-    embed.add_field(name="Action", value=action_type.upper(), inline=True)
-    embed.add_field(name="Modérateur", value=user.mention, inline=True)
-    embed.add_field(name="Heure", value=f"<t:{int(datetime.now().timestamp())}:F>", inline=True)
-    
-    if target:
-        embed.add_field(name="Cible", value=target.mention if hasattr(target, 'mention') else str(target), inline=True)
-    
-    if reason:
-        embed.add_field(name="Raison", value=reason, inline=False)
-    
-    if details:
-        embed.add_field(name="Détails", value=details, inline=False)
-    
-    embed.set_footer(text=f"ID: {user.id} | Serveur: {guild.name}")
-    embed.set_thumbnail(url=user.avatar.url if user.avatar else None)
-    
-    try:
-        await log_channel.send(embed=embed)
-    except Exception as e:
-        logging.error(f"Erreur envoi log: {e}")
-
 @bot.event
 async def on_ready():
     print(f'✅ {bot.user} est connecté!')
-    print(f'🌐 Connecté à {len(bot.guilds)} serveur(s)')
-    
-    # Synchronisation globale et par serveur
     try:
-        # Sync global
-        global_synced = await bot.tree.sync()
-        print(f'✅ {len(global_synced)} commandes globales synchronisées')
-        
-        # Sync par serveur pour les commandes admin
-        total_server_synced = 0
-        for guild in bot.guilds:
-            try:
-                server_synced = await bot.tree.sync(guild=guild)
-                total_server_synced += len(server_synced)
-                print(f'✅ {len(server_synced)} commandes admin sync sur {guild.name}')
-            except Exception as e:
-                print(f'⚠️ Erreur sync {guild.name}: {e}')
-        
-        print(f'🎯 TOTAL: {len(global_synced)} globales + {total_server_synced} serveur = {len(global_synced) + total_server_synced} commandes')
-        print('🚀 Bot prêt et opérationnel!')
-        
+        synced = await bot.tree.sync()
+        print(f'✅ {len(synced)} commandes synchronisées')
     except Exception as e:
-        print(f'❌ Erreur critique sync: {e}')
-        logging.error(f'Erreur synchronisation: {e}')
+        print(f'❌ Erreur sync: {e}')
 
 # COMMANDES DE MODÉRATION BASIQUES
 @admin_group.command(name="kick", description="Exclure un membre")
@@ -201,10 +101,8 @@ async def kick(interaction: discord.Interaction, member: discord.Member, reason:
         embed.add_field(name="Raison", value=reason)
         embed.add_field(name="Par", value=interaction.user.mention)
         await interaction.response.send_message(embed=embed)
-        await log_action(interaction.guild, "kick", interaction.user, member, reason)
-    except Exception as e:
+    except:
         await interaction.response.send_message("❌ Erreur lors de l'exclusion", ephemeral=True)
-        await log_action(interaction.guild, "security", interaction.user, member, f"Erreur kick: {str(e)}")
 
 @admin_group.command(name="ban", description="Bannir un membre")
 async def ban(interaction: discord.Interaction, member: discord.Member, reason: str = "Aucune raison"):
@@ -214,10 +112,8 @@ async def ban(interaction: discord.Interaction, member: discord.Member, reason: 
         embed.add_field(name="Raison", value=reason)
         embed.add_field(name="Par", value=interaction.user.mention)
         await interaction.response.send_message(embed=embed)
-        await log_action(interaction.guild, "ban", interaction.user, member, reason)
-    except Exception as e:
+    except:
         await interaction.response.send_message("❌ Erreur lors du ban", ephemeral=True)
-        await log_action(interaction.guild, "security", interaction.user, member, f"Erreur ban: {str(e)}")
 
 @admin_group.command(name="unban", description="Débannir un utilisateur")
 async def unban(interaction: discord.Interaction, user_id: str, reason: str = "Aucune raison"):
@@ -559,142 +455,6 @@ async def bannedwords(interaction: discord.Interaction):
 
     embed = discord.Embed(title="🚫 Mots bannis", description="\n".join(data["banned_words"]), color=0xff6b6b)
     await interaction.response.send_message(embed=embed, ephemeral=True)
-
-@admin_group.command(name="securityscan", description="Scanner les membres suspects")
-async def security_scan(interaction: discord.Interaction):
-    await interaction.response.defer()
-    
-    suspects = []
-    recent_joins = []
-    
-    for member in interaction.guild.members:
-        if member.bot:
-            continue
-            
-        # Compte récent (moins de 7 jours)
-        account_age = datetime.now() - member.created_at.replace(tzinfo=None)
-        if account_age.days < 7:
-            recent_joins.append(member)
-        
-        # Profil suspect (pas d'avatar, nom bizarre)
-        if not member.avatar or len([c for c in member.name if not c.isascii()]) > 5:
-            suspects.append(member)
-    
-    embed = discord.Embed(title="🔍 SCAN DE SÉCURITÉ", color=0xff0000)
-    embed.add_field(name="👤 Comptes récents (<7j)", value=len(recent_joins), inline=True)
-    embed.add_field(name="⚠️ Profils suspects", value=len(suspects), inline=True)
-    embed.add_field(name="📊 Total membres", value=interaction.guild.member_count, inline=True)
-    
-    if recent_joins[:10]:  # Max 10
-        recent_list = "\n".join([f"{m.mention} ({(datetime.now() - m.created_at.replace(tzinfo=None)).days}j)" for m in recent_joins[:10]])
-        embed.add_field(name="🕐 Comptes récents", value=recent_list, inline=False)
-    
-    if suspects[:10]:  # Max 10
-        suspect_list = "\n".join([f"{m.mention} - {m.name}" for m in suspects[:10]])
-        embed.add_field(name="🚨 Profils suspects", value=suspect_list, inline=False)
-    
-    await interaction.followup.send(embed=embed)
-    await log_action(interaction.guild, "security", interaction.user, details="Scan de sécurité effectué")
-
-@admin_group.command(name="quarantine", description="Isoler un membre suspect")
-async def quarantine(interaction: discord.Interaction, member: discord.Member, reason: str = "Comportement suspect"):
-    try:
-        # Retirer tous les rôles sauf @everyone
-        roles_removed = []
-        for role in member.roles[1:]:  # Skip @everyone
-            if role < interaction.guild.me.top_role:
-                await member.remove_roles(role)
-                roles_removed.append(role.name)
-        
-        # Timeout 24h
-        await member.timeout(datetime.now() + timedelta(hours=24), reason=f"Quarantaine: {reason}")
-        
-        embed = discord.Embed(title="🚨 QUARANTAINE", color=0xff4500)
-        embed.add_field(name="Membre", value=member.mention, inline=True)
-        embed.add_field(name="Raison", value=reason, inline=True)
-        embed.add_field(name="Durée", value="24 heures", inline=True)
-        embed.add_field(name="Rôles retirés", value=", ".join(roles_removed) if roles_removed else "Aucun", inline=False)
-        
-        await interaction.response.send_message(embed=embed)
-        await log_action(interaction.guild, "security", interaction.user, member, reason, f"Quarantaine - Rôles retirés: {', '.join(roles_removed)}")
-        
-    except Exception as e:
-        await interaction.response.send_message(f"❌ Erreur quarantaine: {str(e)}", ephemeral=True)
-
-@admin_group.command(name="logs", description="Voir les derniers logs de sécurité")
-async def view_logs(interaction: discord.Interaction, limit: int = 10):
-    guild_id = interaction.guild.id
-    data = get_server_data(guild_id)
-    log_channel_id = data.get("log_channel_id")
-    
-    if not log_channel_id:
-        return await interaction.response.send_message("❌ Aucun canal de logs configuré", ephemeral=True)
-    
-    log_channel = bot.get_channel(log_channel_id)
-    if not log_channel:
-        return await interaction.response.send_message("❌ Canal de logs introuvable", ephemeral=True)
-    
-    try:
-        messages = []
-        async for message in log_channel.history(limit=min(limit, 50)):
-            if message.embeds and message.author == bot.user:
-                embed = message.embeds[0]
-                if "LOG DE SÉCURITÉ" in embed.title:
-                    messages.append(message)
-        
-        if not messages:
-            return await interaction.response.send_message("Aucun log récent trouvé", ephemeral=True)
-        
-        embed = discord.Embed(title="📋 DERNIERS LOGS", color=0x0099ff)
-        
-        for i, msg in enumerate(messages[:limit], 1):
-            log_embed = msg.embeds[0]
-            action = next((field.value for field in log_embed.fields if field.name == "Action"), "Inconnue")
-            moderator = next((field.value for field in log_embed.fields if field.name == "Modérateur"), "Inconnu")
-            
-            embed.add_field(
-                name=f"#{i} - {action}",
-                value=f"Par: {moderator}\n<t:{int(msg.created_at.timestamp())}:R>",
-                inline=True
-            )
-        
-        embed.set_footer(text=f"Affichage des {len(messages)} derniers logs")
-        await interaction.response.send_message(embed=embed, ephemeral=True)
-        
-    except Exception as e:
-        await interaction.response.send_message(f"❌ Erreur lecture logs: {str(e)}", ephemeral=True)
-
-@admin_group.command(name="backup", description="Sauvegarder la configuration du serveur")
-async def backup_config(interaction: discord.Interaction):
-    try:
-        guild_id = interaction.guild.id
-        data = get_server_data(guild_id)
-        
-        # Créer un backup avec timestamp
-        backup_data = {
-            "server_name": interaction.guild.name,
-            "server_id": guild_id,
-            "backup_date": datetime.now().isoformat(),
-            "config": data,
-            "channels": [{"name": c.name, "id": c.id, "type": str(c.type)} for c in interaction.guild.channels],
-            "roles": [{"name": r.name, "id": r.id, "permissions": r.permissions.value} for r in interaction.guild.roles]
-        }
-        
-        # Sauvegarder
-        backup_file = f"configs/backup_{guild_id}_{int(datetime.now().timestamp())}.json"
-        with open(backup_file, 'w', encoding='utf-8') as f:
-            json.dump(backup_data, f, indent=2, ensure_ascii=False, default=str)
-        
-        embed = discord.Embed(title="💾 SAUVEGARDE", color=0x00ff00)
-        embed.add_field(name="Statut", value="✅ Sauvegarde créée", inline=True)
-        embed.add_field(name="Fichier", value=backup_file, inline=True)
-        embed.add_field(name="Taille", value=f"{len(json.dumps(backup_data))} caractères", inline=True)
-        
-        await interaction.response.send_message(embed=embed)
-        await log_action(interaction.guild, "security", interaction.user, details="Sauvegarde de configuration créée")
-        
-    except Exception as e:
-        await interaction.response.send_message(f"❌ Erreur sauvegarde: {str(e)}", ephemeral=True)
 
 # COMMANDES SYSTÈME
 @admin_group.command(name="maintenance", description="Mode maintenance ON")
@@ -1313,7 +1073,6 @@ async def on_message(message):
             try:
                 await message.author.timeout(datetime.now() + timedelta(minutes=5), reason="Spam détecté")
                 await message.channel.send(f"🔇 {message.author.mention} timeout pour spam (5min)")
-                await log_action(message.guild, "spam_detected", bot.user, message.author, "Spam détecté", f"{len(data['anti_spam'][user_id])} messages en 1 minute")
             except:
                 pass
 
